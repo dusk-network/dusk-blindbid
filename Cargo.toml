@@ -1,0 +1,8 @@
+[package]
+name = "blind_bid"
+version = "0.1.0"
+authors = ["CPerezz <carlos@dusk.network>"]
+edition = "2018"
+
+
+[dependencies]
