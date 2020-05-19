@@ -20,6 +20,10 @@ pub fn compute_score(bid: &Bid) -> Scalar {
     bid.value * Scalar::from(2u64).pow(&[128, 0, 0, 0]) * inv_y_prime
 }
 
+/// Computes the score of the bid printing in the ConstraintSystem the proof of the correct
+/// obtention of the score.
+///
+/// Takes 3615 constraints.
 pub fn compute_score_gadget(
     composer: &mut StandardComposer,
     bid: &Bid,
@@ -95,4 +99,66 @@ fn compute_y_primes(y: Scalar) -> (Scalar, Scalar) {
     // Compute 1/y' where `y' = y & 2^129 -1`
     let inv_y_prime = y.invert().unwrap();
     (y_prime, inv_y_prime)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dusk_bls12_381::G1Affine;
+    use dusk_plonk::commitment_scheme::kzg10::PublicParameters;
+    use dusk_plonk::constraint_system::{StandardComposer, Variable};
+    use dusk_plonk::fft::EvaluationDomain;
+    use merlin::Transcript;
+
+    #[test]
+    fn gadget_score_is_scalar_score() {
+        // Generate Composer & Public Parameters
+        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+
+        let mut composer = StandardComposer::new();
+        let mut transcript = Transcript::new(b"Test");
+
+        // Generate a `Bid` with computed `score`.
+        let bid = Bid::new(
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            G1Affine::identity(),
+        );
+
+        // Add as `Variable` to the composer the required values by the compute_score_gadget fn
+        let bid_val_variable = composer.add_input(bid.value);
+        let secret_k_variable = composer.add_input(bid.secret_k);
+        let consensus_round_seed_var = composer.add_input(bid.consensus_round_seed);
+        let latest_consensus_step_var = composer.add_input(bid.latest_consensus_step);
+        let latest_consensus_round_var = composer.add_input(bid.latest_consensus_round);
+
+        // Compute the score using the compute_score_gadget fn
+        let computed_score = compute_score_gadget(
+            &mut composer,
+            &bid,
+            bid_val_variable,
+            secret_k_variable,
+            bid_val_variable,
+            consensus_round_seed_var,
+            latest_consensus_round_var,
+            latest_consensus_step_var,
+        );
+
+        composer.constrain_to_constant(computed_score, bid.score.unwrap(), Scalar::zero());
+        print!("{:?}", composer.circuit_size());
+        // Prove and Verify to check that indeed, the score is correct.
+        composer.add_dummy_constraints();
+
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(4096).unwrap());
+
+        let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
+        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &vec![Scalar::zero()]));
+    }
 }
