@@ -17,7 +17,7 @@ pub fn compute_score(bid: &Bid) -> Scalar {
     // Compute y' and 1/y'.
     let (_, inv_y_prime) = compute_y_primes(y);
     // Return the score `q = v*2^128 / y'`.
-    bid.bid_value * Scalar::from(2u64).pow(&[128, 0, 0, 0]) * inv_y_prime
+    bid.value * Scalar::from(2u64).pow(&[128, 0, 0, 0]) * inv_y_prime
 }
 
 pub fn compute_score_gadget(
