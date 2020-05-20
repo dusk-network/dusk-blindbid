@@ -2,7 +2,8 @@
 //!
 
 use crate::score_gen::score::compute_score;
-use dusk_bls12_381::{G1Affine, Scalar};
+use dusk_bls12_381::Scalar;
+use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::sponge::sponge_hash;
 
 #[derive(Copy, Clone, Debug)]
@@ -32,9 +33,9 @@ pub struct Bid {
     // r
     pub(crate) randomness: Scalar,
     // k
-    pub(crate) secret_k: Scalar,
+    pub(crate) secret_k: JubJubScalar,
     // R = r * G
-    pub(crate) pk: G1Affine,
+    pub(crate) pk: AffinePoint,
 }
 
 impl Default for Bid {
@@ -48,8 +49,8 @@ impl Default for Bid {
             score: None,
             value: Scalar::zero(),
             randomness: Scalar::zero(),
-            secret_k: Scalar::zero(),
-            pk: G1Affine::default(),
+            secret_k: JubJubScalar::zero(),
+            pk: AffinePoint::default(),
         }
     }
 }
@@ -62,8 +63,8 @@ impl Bid {
         latest_consensus_step: Scalar,
         bid_value: Scalar,
         bid_randomness: Scalar,
-        secret_k: Scalar,
-        pk: G1Affine,
+        secret_k: JubJubScalar,
+        pk: AffinePoint,
     ) -> Self {
         // Initialize the Bid with the fields we were provided.
         let mut bid = Bid {
@@ -92,7 +93,7 @@ impl Bid {
     /// get the one-time prover_id and sets it in the Bid.
     pub(crate) fn generate_prover_id(&mut self) {
         self.prover_id = Some(sponge_hash(&[
-            self.secret_k,
+            Scalar::from_bytes(&self.secret_k.to_bytes()).unwrap(),
             self.consensus_round_seed,
             self.latest_consensus_round,
             self.latest_consensus_step,

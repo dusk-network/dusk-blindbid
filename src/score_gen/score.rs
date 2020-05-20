@@ -3,12 +3,13 @@
 use crate::bid::Bid;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
+use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::*;
 
 pub fn compute_score(bid: &Bid) -> Scalar {
     // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed, latest_consensus_round, latest_consensus_step)`.
     let y = sponge::sponge_hash(&[
-        bid.secret_k,
+        Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap(),
         bid.bid_tree_root,
         bid.consensus_round_seed,
         bid.latest_consensus_round,
@@ -49,7 +50,9 @@ pub fn compute_score_gadget(
     // We also need to compute the sponge hash with the scalars since we need to prove the correctness of the inverse
     // of y'.
     let scalar_y = sponge::sponge_hash(&[
-        bid.secret_k,
+        // We wrap up the JubJubScalar as a BlsScalar which will always fit.
+        // That means that the unwrap is safe.
+        Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap(),
         bid.bid_tree_root,
         bid.consensus_round_seed,
         bid.latest_consensus_round,
@@ -127,13 +130,18 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            G1Affine::identity(),
+            // XXX: Set to random as soon as https://github.com/dusk-network/jubjub/issues/4
+            // gets closed.
+            JubJubScalar::zero(),
+            AffinePoint::identity(),
         );
 
         // Add as `Variable` to the composer the required values by the compute_score_gadget fn
         let bid_val_variable = composer.add_input(bid.value);
-        let secret_k_variable = composer.add_input(bid.secret_k);
+        // We wrap up the JubJubScalar as a BlsScalar which will always fit.
+        // That means that the unwrap is safe.
+        let secret_k_variable =
+            composer.add_input(Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap());
         let consensus_round_seed_var = composer.add_input(bid.consensus_round_seed);
         let latest_consensus_step_var = composer.add_input(bid.latest_consensus_step);
         let latest_consensus_round_var = composer.add_input(bid.latest_consensus_round);
