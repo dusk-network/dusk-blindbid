@@ -6,3 +6,11 @@ edition = "2018"
 
 
 [dependencies]
+dusk-plonk = "0.1.0"
+dusk-bls12_381 = "0.1.0"
+hades252 = {git = "https://github.com/dusk-network/Hades252", tag = "v0.5.0"}
+poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", branch = "merkle_hashing"}
+
+[dev-dependencies]
+merlin = "2.0.0"
+rand = "0.7.3"
