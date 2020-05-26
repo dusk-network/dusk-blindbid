@@ -5,6 +5,7 @@
 use super::errors::BidError;
 use super::Bid;
 use dusk_bls12_381::Scalar;
+use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use failure::Error;
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
@@ -35,6 +36,39 @@ pub(crate) fn tree_leaf_encoding(bid: &Bid) -> Result<StorageScalar, Error> {
     // Now that we have all of our values encoded inside the container,
     // collapse it and return the result.
     collapse_accumulator(&byte_container)
+}
+
+/// Encodes a `Bid` in a `StorageScalar` form by applying the correct padding
+/// and encoding methods stated in https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
+/// and collapsing it into a `StorageScalar` which can be then stored inside of a
+/// `kelvin` tree data structure.
+///
+/// It also prints into the Constraint System, the sponge hash that produces the `StorageScalar`.
+/// On this way, we prove that the leaf value was correctly encoded.
+pub(crate) fn tree_leaf_encoding_gadget(
+    composer: &mut StandardComposer,
+    bid: &Bid,
+) -> Result<Variable, Error> {
+    // Generate an empty vector of bytes which will store the padded & encoded
+    // byte-representation of all of the `Bid` elements.
+    let mut byte_container = Vec::with_capacity(28 * 9);
+    // Note that the merkle_tree_root is not used since we can't pre-compute
+    // it. Therefore, any field that relies on it to be computed isn't neither
+    // used to obtain this encoded form.
+    pad_and_accumulate(&mut byte_container, &bid.consensus_round_seed.to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.latest_consensus_round.to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.latest_consensus_step.to_bytes());
+    if bid.prover_id == None {
+        return Err(BidError::MissingBidFields.into());
+    };
+    pad_and_accumulate(&mut byte_container, &bid.prover_id.unwrap().to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.value.to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.randomness.to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.secret_k.to_bytes());
+    pad_and_accumulate(&mut byte_container, &bid.pk.to_bytes());
+    // Now that we have all of our values encoded inside the container,
+    // collapse it and return the result.
+    collapse_accumulator_gadget(composer, &byte_container)
 }
 
 /// Applies the correct padding to whatever data structure that can be represented
@@ -76,10 +110,45 @@ fn collapse_accumulator(byte_storage: &[u8]) -> Result<StorageScalar, Error> {
     Ok(StorageScalar(sponge_hash(&scalar_words)))
 }
 
+/// Collapses a collection of previously-padded bytes into a single `StorageScalar`
+/// using the Poseidon Sponge Hash function.
+///
+/// This prints into the CS the sponge hash operation in order to prove that the
+/// obtained leaf encoding was correctly obtained.
+fn collapse_accumulator_gadget(
+    composer: &mut StandardComposer,
+    byte_storage: &[u8],
+) -> Result<Variable, Error> {
+    // If the len is not multiple of BYTE_PADDING_LEN, return an error.
+    if byte_storage.len() % BYTE_PADDING_LEN != 0 {
+        return Err(BidError::WrongPadding.into());
+    };
+    // Generate a `Scalar` Vec where each `Scalar` is built from a chunk of 28 bytes
+    // of the original `byte_storage`.
+    let mut scalar_words = vec![];
+    for chunk in byte_storage.chunks(BYTE_PADDING_LEN) {
+        // Generate a 32-byte empty chunk
+        let mut inserted_chunk = [0u8; 32];
+        // Pad the 4-last bytes with zeroes since `Scalar::from_bytes()` expects
+        // a `&[u8; 32]`.
+        inserted_chunk[0..28].copy_from_slice(chunk);
+        // Push the Scalar word to the `scalar_words` vec.
+        scalar_words.push(composer.add_input(Scalar::from_bytes(&inserted_chunk).unwrap()));
+    }
+    // Apply the sponge hash function to collapse all chunks into a single
+    // `Scalar`.
+    Ok(sponge_hash_gadget(composer, &scalar_words))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::*;
+    use dusk_bls12_381::G1Affine;
+    use dusk_plonk::commitment_scheme::kzg10::PublicParameters;
+    use dusk_plonk::fft::EvaluationDomain;
     use jubjub::{AffinePoint, Scalar as JubJubScalar};
+    use merlin::Transcript;
 
     #[test]
     fn test_word_padding() {
@@ -111,6 +180,49 @@ mod tests {
 
         assert_eq!(final_expected_scalar, collapsed_accum_obtained.0)
     }
+
+    #[test]
+    fn test_encoding_gadget() {
+        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+
+        let mut composer = StandardComposer::new();
+        let mut transcript = Transcript::new(b"Test");
+
+        // Generate a `Bid` with computed `score`.
+        let bid = Bid::new(
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            Scalar::random(&mut rand::thread_rng()),
+            // XXX: Set to random as soon as https://github.com/dusk-network/jubjub/issues/4
+            // gets closed.
+            JubJubScalar::one(),
+            AffinePoint::identity(),
+        );
+
+        let encoded_leaf_val = tree_leaf_encoding(&bid).unwrap();
+        let encoded_leaf_obtained_var = tree_leaf_encoding_gadget(&mut composer, &bid).unwrap();
+
+        // Check that the results are the same by adding a constraint.
+        composer.constrain_to_constant(
+            encoded_leaf_obtained_var,
+            encoded_leaf_val.0,
+            Scalar::zero(),
+        );
+
+        // Prove and Verify to check that indeed, the score is correct.
+        composer.add_dummy_constraints();
+
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(8709).unwrap());
+
+        let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
+        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &vec![Scalar::zero()]));
+    }
+
     #[ignore]
     #[test]
     fn test_bid_encoding() {
