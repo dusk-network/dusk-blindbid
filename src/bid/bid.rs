@@ -6,7 +6,7 @@ use dusk_bls12_381::Scalar;
 use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::sponge::sponge_hash;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
     // Pub Inputs
     //
@@ -36,23 +36,6 @@ pub struct Bid {
     pub(crate) secret_k: Scalar,
     // R = r * G
     pub(crate) pk: AffinePoint,
-}
-
-impl Default for Bid {
-    fn default() -> Self {
-        Bid {
-            bid_tree_root: Scalar::zero(),
-            consensus_round_seed: Scalar::zero(),
-            latest_consensus_round: Scalar::zero(),
-            latest_consensus_step: Scalar::zero(),
-            prover_id: None,
-            score: None,
-            value: JubJubScalar::zero(),
-            randomness: JubJubScalar::zero(),
-            secret_k: Scalar::zero(),
-            pk: AffinePoint::default(),
-        }
-    }
 }
 
 impl Bid {
