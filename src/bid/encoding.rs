@@ -32,7 +32,6 @@ pub(crate) fn tree_leaf_encoding(bid: &Bid) -> Result<StorageScalar, Error> {
     pad_and_accumulate(&mut byte_container, &bid.randomness.to_bytes());
     pad_and_accumulate(&mut byte_container, &bid.secret_k.to_bytes());
     pad_and_accumulate(&mut byte_container, &bid.pk.to_bytes());
-
     // Now that we have all of our values encoded inside the container,
     // collapse it and return the result.
     collapse_accumulator(&byte_container)
@@ -66,13 +65,67 @@ fn collapse_accumulator(byte_storage: &[u8]) -> Result<StorageScalar, Error> {
     for chunk in byte_storage.chunks(BYTE_PADDING_LEN) {
         // Generate a 32-byte empty chunk
         let mut inserted_chunk = [0u8; 32];
-        // Pad the 4-first bits as zero since `Scalar::from_bytes()` expects
+        // Pad the 4-last bytes with zeroes since `Scalar::from_bytes()` expects
         // a `&[u8; 32]`.
-        inserted_chunk[4..32].copy_from_slice(chunk);
+        inserted_chunk[0..28].copy_from_slice(chunk);
         // Push the Scalar word to the `scalar_words` vec.
         scalar_words.push(Scalar::from_bytes(&inserted_chunk).unwrap());
     }
     // Apply the sponge hash function to collapse all chunks into a single
     // `Scalar`.
     Ok(StorageScalar(sponge_hash(&scalar_words)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jubjub::{AffinePoint, Scalar as JubJubScalar};
+
+    #[test]
+    fn test_word_padding() {
+        let scalar = Scalar::from(10u64);
+        let bytes = [3u8, 0xa, 0xd];
+        // Generate a container.
+        let mut byte_container = vec![];
+        pad_and_accumulate(&mut byte_container, &scalar.to_bytes());
+        pad_and_accumulate(&mut byte_container, &bytes);
+        let collapsed_accum_obtained = collapse_accumulator(&byte_container).unwrap();
+
+        // Define the expected collapsed accumulator. Len has to be multiple of 28 and in
+        // this case, with a len of 84 will be enough.
+        let collapsed_accum_expected = [
+            10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 10,
+            13, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let chunks: Vec<Scalar> = collapsed_accum_expected
+            .chunks(28)
+            .map(|chunk| {
+                let mut bytes = [0u8; 32];
+                bytes[0..28].copy_from_slice(chunk);
+                Scalar::from_bytes(&bytes).unwrap()
+            })
+            .collect();
+
+        let final_expected_scalar = sponge_hash(&chunks);
+
+        assert_eq!(final_expected_scalar, collapsed_accum_obtained.0)
+    }
+    #[ignore]
+    #[test]
+    fn test_bid_encoding() {
+        let bid = Bid::new(
+            Scalar::one(),
+            Scalar::one(),
+            Scalar::one(),
+            Scalar::one(),
+            Scalar::one(),
+            Scalar::one(),
+            // Set to one so the inverse does not fail.
+            JubJubScalar::one(),
+            AffinePoint::identity(),
+        );
+        // We need test vectors for this.
+        // See: https://github.com/dusk-network/dusk-blindbid/issues/8
+    }
 }

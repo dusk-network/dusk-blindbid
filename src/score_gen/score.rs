@@ -132,7 +132,7 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             // XXX: Set to random as soon as https://github.com/dusk-network/jubjub/issues/4
             // gets closed.
-            JubJubScalar::zero(),
+            JubJubScalar::one(),
             AffinePoint::identity(),
         );
 
@@ -159,7 +159,6 @@ mod tests {
         );
 
         composer.constrain_to_constant(computed_score, bid.score.unwrap(), Scalar::zero());
-        print!("{:?}", composer.circuit_size());
         // Prove and Verify to check that indeed, the score is correct.
         composer.add_dummy_constraints();
 
