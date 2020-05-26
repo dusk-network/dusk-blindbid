@@ -102,6 +102,7 @@ mod tests {
     use dusk_plonk::fft::EvaluationDomain;
     use merlin::Transcript;
 
+    #[ignore]
     #[test]
     fn gadget_score_is_scalar_score() {
         // Generate Composer & Public Parameters
