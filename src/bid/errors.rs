@@ -1,6 +1,5 @@
 //! Errors related to the Bid
 
-use failure::Error;
 use failure::Fail;
 
 /// Definition of the erros that Bid operations might have.

@@ -7,18 +7,7 @@ use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::*;
 
 pub fn compute_score(bid: &Bid) -> Scalar {
-    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed, latest_consensus_round, latest_consensus_step)`.
-    let y = sponge::sponge_hash(&[
-        Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap(),
-        bid.bid_tree_root,
-        bid.consensus_round_seed,
-        bid.latest_consensus_round,
-        bid.latest_consensus_step,
-    ]);
-    // Compute y' and 1/y'.
-    let (_, inv_y_prime) = compute_y_primes(y);
-    // Return the score `q = v*2^128 / y'`.
-    bid.value * Scalar::from(2u64).pow(&[128, 0, 0, 0]) * inv_y_prime
+    unimplemented!()
 }
 
 /// Computes the score of the bid printing in the ConstraintSystem the proof of the correct
@@ -128,16 +117,17 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
+            JubJubScalar::one(),
+            JubJubScalar::one(),
             // XXX: Set to random as soon as https://github.com/dusk-network/jubjub/issues/4
             // gets closed.
-            JubJubScalar::one(),
+            Scalar::random(&mut rand::thread_rng()),
             AffinePoint::identity(),
         );
 
         // Add as `Variable` to the composer the required values by the compute_score_gadget fn
-        let bid_val_variable = composer.add_input(bid.value);
+        let bid_val_variable =
+            composer.add_input(Scalar::from_bytes(&bid.value.to_bytes()).unwrap());
         // We wrap up the JubJubScalar as a BlsScalar which will always fit.
         // That means that the unwrap is safe.
         let secret_k_variable =

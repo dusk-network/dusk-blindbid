@@ -29,11 +29,11 @@ pub struct Bid {
     // Private Inputs
     //
     // v
-    pub(crate) value: Scalar,
+    pub(crate) value: JubJubScalar,
     // r
-    pub(crate) randomness: Scalar,
+    pub(crate) randomness: JubJubScalar,
     // k
-    pub(crate) secret_k: JubJubScalar,
+    pub(crate) secret_k: Scalar,
     // R = r * G
     pub(crate) pk: AffinePoint,
 }
@@ -47,9 +47,9 @@ impl Default for Bid {
             latest_consensus_step: Scalar::zero(),
             prover_id: None,
             score: None,
-            value: Scalar::zero(),
-            randomness: Scalar::zero(),
-            secret_k: JubJubScalar::zero(),
+            value: JubJubScalar::zero(),
+            randomness: JubJubScalar::zero(),
+            secret_k: Scalar::zero(),
             pk: AffinePoint::default(),
         }
     }
@@ -61,9 +61,9 @@ impl Bid {
         consensus_round_seed: Scalar,
         latest_consensus_round: Scalar,
         latest_consensus_step: Scalar,
-        bid_value: Scalar,
-        bid_randomness: Scalar,
-        secret_k: JubJubScalar,
+        bid_value: JubJubScalar,
+        bid_randomness: JubJubScalar,
+        secret_k: Scalar,
         pk: AffinePoint,
     ) -> Self {
         // Initialize the Bid with the fields we were provided.
