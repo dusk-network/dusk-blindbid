@@ -13,6 +13,8 @@ poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", branch = "me
 failure = "0.1.7"
 kelvin = "0.13.0"
 jubjub = {git = "https://github.com/dusk-network/jubjub", branch = "master"}
+num-bigint = "0.2.6"
+num-traits = "0.2.11"
 
 [dev-dependencies]
 merlin = "2.0.0"

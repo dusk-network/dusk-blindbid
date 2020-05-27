@@ -1,13 +1,66 @@
 //! Score generation
 
+use super::errors::ScoreError;
 use crate::bid::Bid;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
-use jubjub::{AffinePoint, Scalar as JubJubScalar};
+use failure::Error;
+use num_bigint::BigUint;
+use num_traits::{One, Zero};
 use poseidon252::sponge::*;
 
-pub fn compute_score(bid: &Bid) -> Scalar {
-    unimplemented!()
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub struct Score {
+    pub(crate) score: Scalar,
+    pub(crate) r1: Scalar,
+    pub(crate) r2: Scalar,
+}
+
+impl Score {
+    pub(crate) fn new(score: Scalar, r1: Scalar, r2: Scalar) -> Self {
+        Score { score, r1, r2 }
+    }
+}
+
+pub fn compute_score(bid: &Bid) -> Result<Score, Error> {
+    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed, latest_consensus_round, latest_consensus_step)`.
+    let y = sponge::sponge_hash(&[
+        bid.secret_k,
+        bid.bid_tree_root,
+        bid.consensus_round_seed,
+        bid.latest_consensus_round,
+        bid.latest_consensus_step,
+    ]);
+
+    // Truncate Y to left 128 bits and interpret the result as 128-bit integer.
+    // Keep the right 128 bits as another integer (r1).
+    let y_prime = BigUint::from_bytes_le(&y.to_bytes()[16..32]);
+    let r1 = BigUint::from_bytes_le(&y.to_bytes()[0..16]);
+
+    // Get the bid value outside of the modular field and treat it as
+    // an integer.
+    let bid_value = BigUint::from_bytes_le(&bid.value.to_bytes());
+    // Compute the final score
+    let (f, r2) = match y_prime == BigUint::zero() {
+        // If y' != 0 -> f = (bid_value * 2^128 / y')
+        // r2 is assigned to the remainder of the division.
+        false => {
+            let num = bid_value * (BigUint::one() << 128);
+            (num.clone() / y_prime.clone(), num % y_prime)
+        }
+        // If y' == 0 -> f = bid_value * 2^128
+        // Since there's not any division, r2 is assigned to 0 since
+        // there's not any remainder.
+        true => (bid_value * (BigUint::one() << 128), BigUint::zero()),
+    };
+
+    // Get Scalars from the bigUints and return a `Score` if the conversions could
+    // be correctly done.
+    Ok(Score::new(
+        biguint_to_scalar(f)?,
+        biguint_to_scalar(r1)?,
+        biguint_to_scalar(r2)?,
+    ))
 }
 
 /// Computes the score of the bid printing in the ConstraintSystem the proof of the correct
@@ -24,73 +77,19 @@ pub fn compute_score_gadget(
     latest_consensus_round: Variable,
     latest_consensus_step: Variable,
 ) -> Variable {
-    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed, latest_consensus_round, latest_consensus_step)`.
-    // This is done in ZK using the sponge hash gadget.
-    let y = sponge::sponge_hash_gadget(
-        composer,
-        &[
-            secret_k,
-            bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        ],
-    );
-    // We also need to compute the sponge hash with the scalars since we need to prove the correctness of the inverse
-    // of y'.
-    let scalar_y = sponge::sponge_hash(&[
-        // We wrap up the JubJubScalar as a BlsScalar which will always fit.
-        // That means that the unwrap is safe.
-        Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap(),
-        bid.bid_tree_root,
-        bid.consensus_round_seed,
-        bid.latest_consensus_round,
-        bid.latest_consensus_step,
-    ]);
-    // Compute 1/y' where `y' = y & 2^129 -1`. This needs to be done for `Scalar` and `Variable` backends
-    // to then assert that the inverse is correct.
-    // Compute y' and 1/y'.
-    let (_, inv_y_prime_scalar) = compute_y_primes(scalar_y);
-
-    // Compute y' as a Variable.
-    let y_prime_var = {
-        let truncate_val =
-            composer.add_input(Scalar::from(2u64).pow(&[129, 0, 0, 0]) - Scalar::one());
-        composer.logic_and_gate(y, truncate_val, 256)
-    };
-
-    // Generate a Variable for 1/y'.
-    let supposed_inv_y_prime = composer.add_input(inv_y_prime_scalar);
-    // Check that 1/y' is indeed the inverse of y'.
-    // To do that, we multiply the real 1/y' and the computed y' and subtract one.
-    // This is indeed the constraint that verifies the integrity of the inverse.
-    //
-    // We don't need the input since it should be 0. If it is not, the verification process
-    // will fail.
-    composer.mul(
-        Scalar::one(),
-        y_prime_var,
-        supposed_inv_y_prime,
-        -Scalar::one(),
-        Scalar::zero(),
-    );
-    // Return the score `q = v*2^128 / y'`.
-    composer.mul(
-        Scalar::from(2u64).pow(&[128, 0, 0, 0]),
-        bid_value,
-        supposed_inv_y_prime,
-        Scalar::zero(),
-        Scalar::zero(),
-    )
+    unimplemented!()
 }
 
 // Given the y parameter, return the y' and it's inverse value.
-fn compute_y_primes(y: Scalar) -> (Scalar, Scalar) {
-    // Compute y'
-    let y_prime = y & (Scalar::from(2u64).pow(&[129, 0, 0, 0]) - Scalar::one());
-    // Compute 1/y' where `y' = y & 2^129 -1`
-    let inv_y_prime = y.invert().unwrap();
-    (y_prime, inv_y_prime)
+fn biguint_to_scalar(biguint: BigUint) -> Result<Scalar, Error> {
+    let mut bytes = [0u8; 32];
+    let biguint_bytes = biguint.to_bytes_le();
+    if biguint_bytes.len() >= 32 {
+        return Err(ScoreError::InvalidScoreFieldsLen.into());
+    };
+    bytes[0..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
+    // Due to the previous conditions, we can unwrap here safely.
+    Ok(Scalar::from_bytes(&bytes).unwrap())
 }
 
 #[cfg(test)]
@@ -101,62 +100,4 @@ mod tests {
     use dusk_plonk::constraint_system::{StandardComposer, Variable};
     use dusk_plonk::fft::EvaluationDomain;
     use merlin::Transcript;
-
-    #[ignore]
-    #[test]
-    fn gadget_score_is_scalar_score() {
-        // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
-        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
-
-        let mut composer = StandardComposer::new();
-        let mut transcript = Transcript::new(b"Test");
-
-        // Generate a `Bid` with computed `score`.
-        let bid = Bid::new(
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            JubJubScalar::one(),
-            JubJubScalar::one(),
-            // XXX: Set to random as soon as https://github.com/dusk-network/jubjub/issues/4
-            // gets closed.
-            Scalar::random(&mut rand::thread_rng()),
-            AffinePoint::identity(),
-        );
-
-        // Add as `Variable` to the composer the required values by the compute_score_gadget fn
-        let bid_val_variable =
-            composer.add_input(Scalar::from_bytes(&bid.value.to_bytes()).unwrap());
-        // We wrap up the JubJubScalar as a BlsScalar which will always fit.
-        // That means that the unwrap is safe.
-        let secret_k_variable =
-            composer.add_input(Scalar::from_bytes(&bid.secret_k.to_bytes()).unwrap());
-        let consensus_round_seed_var = composer.add_input(bid.consensus_round_seed);
-        let latest_consensus_step_var = composer.add_input(bid.latest_consensus_step);
-        let latest_consensus_round_var = composer.add_input(bid.latest_consensus_round);
-
-        // Compute the score using the compute_score_gadget fn
-        let computed_score = compute_score_gadget(
-            &mut composer,
-            &bid,
-            bid_val_variable,
-            secret_k_variable,
-            bid_val_variable,
-            consensus_round_seed_var,
-            latest_consensus_round_var,
-            latest_consensus_step_var,
-        );
-
-        composer.constrain_to_constant(computed_score, bid.score.unwrap(), Scalar::zero());
-        // Prove and Verify to check that indeed, the score is correct.
-        composer.add_dummy_constraints();
-
-        let prep_circ =
-            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(4096).unwrap());
-
-        let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
-        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &vec![Scalar::zero()]));
-    }
 }

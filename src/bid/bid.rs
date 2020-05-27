@@ -1,8 +1,9 @@
 //! Bid data structure
 //!
 
-use crate::score_gen::score::compute_score;
+use crate::score_gen::{compute_score, Score};
 use dusk_bls12_381::Scalar;
+use failure::Error;
 use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::sponge::sponge_hash;
 
@@ -24,7 +25,7 @@ pub struct Bid {
     // i (One time identity of the prover)
     pub(crate) prover_id: Option<Scalar>,
     // q (Score of the bid)
-    pub(crate) score: Option<Scalar>,
+    pub(crate) score: Option<Score>,
     //
     // Private Inputs
     //
@@ -48,7 +49,7 @@ impl Bid {
         bid_randomness: JubJubScalar,
         secret_k: Scalar,
         pk: AffinePoint,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         // Initialize the Bid with the fields we were provided.
         let mut bid = Bid {
             bid_tree_root,
@@ -65,9 +66,9 @@ impl Bid {
         // Compute and add to the Bid the `prover_id`.
         bid.generate_prover_id();
         // Compute score and append it to the Bid.
-        bid.score = Some(compute_score(&bid));
+        bid.score = Some(compute_score(&bid)?);
 
-        bid
+        Ok(bid)
     }
 
     /// One-time prover-id is stated to be H(secret_k, sigma^s, k^t, k^s).

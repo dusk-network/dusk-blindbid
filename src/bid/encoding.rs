@@ -39,7 +39,7 @@ pub(crate) fn tree_leaf_encoding(bid: &Bid) -> Result<StorageScalar, Error> {
     if bid.score == None {
         return Err(BidError::MissingBidFields.into());
     }
-    words_deposit.push(bid.score.unwrap());
+    words_deposit.push(bid.score.unwrap().score);
     // Wrap up JubJubScalar bytes into BlsScalar bytes for value and randomness terms
     words_deposit.push(Scalar::from_bytes(&bid.value.to_bytes()).unwrap());
     words_deposit.push(Scalar::from_bytes(&bid.randomness.to_bytes()).unwrap());
