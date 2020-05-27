@@ -84,7 +84,7 @@ pub fn compute_score_gadget(
 fn biguint_to_scalar(biguint: BigUint) -> Result<Scalar, Error> {
     let mut bytes = [0u8; 32];
     let biguint_bytes = biguint.to_bytes_le();
-    if biguint_bytes.len() >= 32 {
+    if biguint_bytes.len() > 32 {
         return Err(ScoreError::InvalidScoreFieldsLen.into());
     };
     bytes[0..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
@@ -100,4 +100,12 @@ mod tests {
     use dusk_plonk::constraint_system::{StandardComposer, Variable};
     use dusk_plonk::fft::EvaluationDomain;
     use merlin::Transcript;
+
+    #[test]
+    fn biguint_scalar_conversion() {
+        let rand_scalar = Scalar::random(&mut rand::thread_rng());
+        let big_uint = BigUint::from_bytes_le(&rand_scalar.to_bytes());
+
+        assert_eq!(biguint_to_scalar(big_uint).unwrap(), rand_scalar)
+    }
 }
