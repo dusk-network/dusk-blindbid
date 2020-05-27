@@ -12,13 +12,21 @@ use poseidon252::sponge::*;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub struct Score {
     pub(crate) score: Scalar,
+    pub(crate) y: Scalar,
+    pub(crate) y_prime: Scalar,
     pub(crate) r1: Scalar,
     pub(crate) r2: Scalar,
 }
 
 impl Score {
-    pub(crate) fn new(score: Scalar, r1: Scalar, r2: Scalar) -> Self {
-        Score { score, r1, r2 }
+    pub(crate) fn new(score: Scalar, y: Scalar, y_prime: Scalar, r1: Scalar, r2: Scalar) -> Self {
+        Score {
+            score,
+            y,
+            y_prime,
+            r1,
+            r2,
+        }
     }
 }
 
@@ -46,7 +54,7 @@ pub fn compute_score(bid: &Bid) -> Result<Score, Error> {
         // r2 is assigned to the remainder of the division.
         false => {
             let num = bid_value * (BigUint::one() << 128);
-            (num.clone() / y_prime.clone(), num % y_prime)
+            (&num / &y_prime, &num % &y_prime)
         }
         // If y' == 0 -> f = bid_value * 2^128
         // Since there's not any division, r2 is assigned to 0 since
@@ -58,25 +66,16 @@ pub fn compute_score(bid: &Bid) -> Result<Score, Error> {
     // be correctly done.
     Ok(Score::new(
         biguint_to_scalar(f)?,
+        y,
+        biguint_to_scalar(y_prime)?,
         biguint_to_scalar(r1)?,
         biguint_to_scalar(r2)?,
     ))
 }
 
-/// Computes the score of the bid printing in the ConstraintSystem the proof of the correct
-/// obtention of the score.
-///
-/// Takes 3615 constraints.
-pub fn compute_score_gadget(
-    composer: &mut StandardComposer,
-    bid: &Bid,
-    bid_value: Variable,
-    secret_k: Variable,
-    bid_tree_root: Variable,
-    consensus_round_seed: Variable,
-    latest_consensus_round: Variable,
-    latest_consensus_step: Variable,
-) -> Variable {
+/// Proves that a `Score` is correctly generated.
+/// Prints the proving statements in the passed Constraint System.
+pub fn correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) -> Variable {
     unimplemented!()
 }
 
