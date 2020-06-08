@@ -351,4 +351,36 @@ mod tests {
         // This should pass since the range_proof holds.
         assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
     }
+
+    #[test]
+    fn wrong_complex_rangeproof() {
+        // Generate Composer & Public Parameters
+        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
+        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+        let mut composer = StandardComposer::new();
+        let mut transcript = Transcript::new(b"TEST");
+
+        let res = single_complex_range_proof(
+            &mut composer,
+            Scalar::from(2u64).pow(&[130u64, 0, 0, 0]),
+            Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
+        )
+        .unwrap();
+        // Constraint res to be false, since the range should not hold.
+        composer.constrain_to_constant(res, Scalar::zero(), Scalar::zero());
+        // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
+        // to zero polynomials.
+        composer.add_dummy_constraints();
+
+        let prep_circ = composer.preprocess(
+            &ck,
+            &mut transcript,
+            &EvaluationDomain::new(composer.circuit_size()).unwrap(),
+        );
+
+        let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
+        // This should pass since the range_proof doesn't hold and we constrained the
+        // boolean result of it to be false.
+        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
+    }
 }
