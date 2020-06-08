@@ -186,19 +186,20 @@ fn single_complex_range_proof(
     let mut var_accumulator = composer.zero_var;
     let mut accumulator = Scalar::zero();
 
-    bits.iter().enumerate().for_each(|(idx, bit)| {
-        let bit = composer.add_input(Scalar::from(*bit as u64));
+    bits[..129].iter().enumerate().for_each(|(idx, bit)| {
+        let bit_var = composer.add_input(Scalar::from(*bit as u64));
         // Apply boolean constraint to the bit.
-        composer.bool_gate(bit);
+        composer.bool_gate(bit_var);
         // Accumulate the bit multiplied by 2^(i-1) as a variable
         var_accumulator = composer.add(
             (Scalar::one(), var_accumulator),
-            (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit),
+            (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
             Scalar::zero(),
             Scalar::zero(),
         );
         // Compute the same accumulator with scalars
-        accumulator = accumulator + (accumulator * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]));
+        accumulator = accumulator
+            + (Scalar::from(*bit as u64) * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]));
     });
     // Compute `Chi(x)` =  Sum(vi * 2^(i-1)) - (x + b').
     let witness_plus_b_prime = composer.add_input(witness + b_prime);
@@ -210,7 +211,6 @@ fn single_complex_range_proof(
         Scalar::zero(),
         Scalar::zero(),
     );
-    println!("Circuit size at chi(x) comp: {:?}", chi_x_var);
     // It is possible to replace a constraint $\chi(\mathbf{x})=0$ on variables $\mathbf{x}$
     // with a set of constraints $\psi$ on  new variables $(u,y,z)$ such
     // that $y=1$ if $\chi$ holds and $y=0$ otherwise.
@@ -226,16 +226,24 @@ fn single_complex_range_proof(
     // 0,& \text{if }u=0.
     // \end{cases}
     let u = witness + b_prime - accumulator;
+    // Conditionally assign `1` or `0` to `y`.
     let y = if u == Scalar::zero() {
         composer.add_input(Scalar::one())
     } else {
         composer.add_input(Scalar::zero())
     };
-
-    if u.invert().is_none().into() {
-        return Err(BidError::MissingBidFields.into());
-    };
-    let z = composer.add_input(u.invert().unwrap());
+    // Conditionally assign `1/u` or `0` to z
+    let mut z = composer.zero_var;
+    if u != Scalar::zero() {
+        // If u != zero -> `z = 1/u`
+        // Otherways, `u = 0` as it was defined avobe.
+        // Check inverse existance, otherways, err.
+        if u.invert().is_none().into() {
+            return Err(ScoreError::NonExistingInverse.into());
+        };
+        // Safe to unwrap here.
+        z = composer.add_input(u.invert().unwrap());
+    }
     // We can safely unwrap `u` now.
     // Now we need to check the following to ensure we can provide a boolean
     // result representing wether the rangeproof holds or not:
@@ -263,7 +271,6 @@ fn single_complex_range_proof(
     composer.assert_equal(one_min_y, u_times_z);
     let y_times_u = composer.mul(u, one, y, Scalar::zero(), Scalar::zero());
     composer.assert_equal(y_times_u, composer.zero_var);
-
     Ok(y)
 }
 
@@ -300,6 +307,13 @@ mod tests {
     use merlin::Transcript;
 
     #[test]
+    fn scalar_bits() {
+        let two_pow_128_min_one = Scalar::from(2u64).pow(&[128, 0, 0, 0]) - Scalar::one();
+        let bits = scalar_to_bits(&two_pow_128_min_one);
+        println!("{:?}", &bits[..]);
+    }
+
+    #[test]
     fn biguint_scalar_conversion() {
         let rand_scalar = Scalar::random(&mut rand::thread_rng());
         let big_uint = BigUint::from_bytes_le(&rand_scalar.to_bytes());
@@ -308,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn complex_rangeproof() {
+    fn correct_complex_rangeproof() {
         // Generate Composer & Public Parameters
         let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
         let (ck, vk) = pub_params.trim(1 << 16).unwrap();
@@ -321,8 +335,8 @@ mod tests {
             Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
         )
         .unwrap();
-        println!("{:?} {:?}", res, composer.add_input(Scalar::one()));
-        composer.check_circuit_satisfied();
+        // Constraint res to be true, since the range should hold.
+        composer.constrain_to_constant(res, Scalar::one(), Scalar::zero());
         // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
         // to zero polynomials.
         composer.add_dummy_constraints();
@@ -334,6 +348,7 @@ mod tests {
         );
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
+        // This should pass since the range_proof holds.
         assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
     }
 }
