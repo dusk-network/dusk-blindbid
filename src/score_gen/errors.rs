@@ -9,4 +9,7 @@ pub enum ScoreError {
     /// fit inside a `Scalar`.
     #[fail(display = "score results do not fit inside of Scalar")]
     InvalidScoreFieldsLen,
+    /// Error for computations of inverses that do not exists (non-Qr's)
+    #[fail(display = "Inverse of the Scalar does not exist")]
+    NonExistingInverse,
 }
