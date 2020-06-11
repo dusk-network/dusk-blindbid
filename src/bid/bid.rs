@@ -3,6 +3,11 @@
 
 use crate::score_gen::{compute_score, Score};
 use dusk_bls12_381::Scalar;
+use dusk_plonk::{
+    commitment_scheme::kzg10::{ProverKey, PublicParameters},
+    constraint_system::StandardComposer,
+    proof_system::Proof,
+};
 use failure::Error;
 use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::sponge::sponge_hash;
@@ -82,5 +87,13 @@ impl Bid {
             self.latest_consensus_round,
             self.latest_consensus_step,
         ]));
+    }
+
+    pub fn prove_score_generation(&self, composer: &mut StandardComposer) -> Result<Proof, Error> {
+        use crate::score_gen::score::prove_correct_score_gadget;
+
+        prove_correct_score_gadget(composer, self)?;
+        // XXX: Return the proof with a pre-computed PreprocessedCircuit and ProverKey
+        unimplemented!()
     }
 }
