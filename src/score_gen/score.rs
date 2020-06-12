@@ -104,18 +104,19 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         Scalar::zero(),
         Scalar::zero(),
     );
-    // 2.(r1 < |Fr|/2^128 AND Y' < 2^128 +1 ) OR (r1 = |Fr|/2^128 AND Y' < |Fr| mod 2^128).
+    // 2.(r1 < |Fr|/2^128 AND Y' < 2^128) OR (r1 = |Fr|/2^128 AND Y' < |Fr| mod 2^128).
     //
     // 2.1. First op will be a complex rangeproof between r1 and the range (Order of the Scalar Field / 2^128 (No modular division))
     // The result should be 0 if the rangeproof holds.
-    let minus_one_div_2_pow_128 = {
-        let min_one = BigUint::from_bytes_le(&(-Scalar::one()).to_bytes());
-        min_one / &two_pow_128_buint
+    let scalar_field_ord_div_2_pow_128 = {
+        let scalar_field_order =
+            BigUint::from_bytes_le(&(-Scalar::one()).to_bytes()) + BigUint::one();
+        scalar_field_order / &two_pow_128_buint
     };
     let first_cond = single_complex_range_proof(
         composer,
         score.r1,
-        biguint_to_scalar(minus_one_div_2_pow_128.clone())?,
+        biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
     )?;
 
     // 2.2. Then we have a single Rangeproof between Y' being in the range [0-2^128]
@@ -123,15 +124,19 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
     // 2.3. Third, we have an equalty checking between r1 & the order of the Scalar field divided (no modular division)
     // by 2^128.
     // We simply subtract both values and if it's equal, we will get a 0.
+
+    let one = composer.add_input(Scalar::one());
     let third_cond = {
-        let one = composer.add_input(Scalar::one());
         let zero_or_other = composer.add(
             (Scalar::one(), r1),
-            (-biguint_to_scalar(minus_one_div_2_pow_128.clone())?, one),
+            (
+                -biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
+                one,
+            ),
             Scalar::zero(),
             Scalar::zero(),
         );
-        let u = score.r1 - biguint_to_scalar(minus_one_div_2_pow_128)?;
+        let u = score.r1 - biguint_to_scalar(scalar_field_ord_div_2_pow_128)?;
         // Conditionally assign `1` or `0` to `y`.
         let y = if u == Scalar::zero() {
             composer.add_input(Scalar::one())
@@ -192,16 +197,37 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
     )?;
     // Apply the point 2 constraint.
     //(r1 < |Fr|/2^128 AND Y' < 2^128 +1)
-    let left_assign = composer.logic_and_gate(first_cond, second_cond, 128);
+    let left_assign = composer.mul(
+        Scalar::one(),
+        first_cond,
+        second_cond,
+        Scalar::zero(),
+        Scalar::zero(),
+    );
     // (r1 = |Fr|/2^128 AND Y' < |Fr| mod 2^128)
-    let right_assign = composer.logic_and_gate(third_cond, fourth_cond, 128);
+    let right_assign = composer.mul(
+        Scalar::one(),
+        third_cond,
+        fourth_cond,
+        Scalar::zero(),
+        Scalar::zero(),
+    );
     // left_assign XOR right_assign = 1
     // This is possible since condition 1. and 3. are mutually exclusive. That means
     // that if one is true, the other part of the equation will be false (0).
-    // Therefore, we can apply an XOR and check that both sides of the equal are different
-    // since: Both can't be true, but both can be false, and this has to make the proof fail.
-    let should_be_true = composer.logic_xor_gate(left_assign, right_assign, 2);
-    composer.constrain_to_constant(should_be_true, Scalar::one(), Scalar::zero());
+    // Therefore, we can apply a mul gate since the inputs are boolean and
+    // both sides of the equal can't be true, but both can be false, and this has to make the proof fail.
+    // The following gate computes the XOR and constraints the result to be equal to one.
+    composer.add_gate(
+        left_assign,
+        right_assign,
+        one,
+        Scalar::one(),
+        Scalar::one(),
+        Scalar::zero(),
+        -Scalar::one(),
+        Scalar::zero(),
+    );
 
     // 3. r2 < Y' we need a 128-bit range_proof
     let should_be_1 =
@@ -345,6 +371,8 @@ fn single_complex_range_proof(
     composer.assert_equal(one_min_y, u_times_z);
     let y_times_u = composer.mul(u, one, y, Scalar::zero(), Scalar::zero());
     composer.assert_equal(y_times_u, composer.zero_var);
+    // Constraint the result to be boolean
+    composer.bool_gate(y);
     Ok(y)
 }
 
