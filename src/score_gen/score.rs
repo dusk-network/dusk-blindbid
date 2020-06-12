@@ -435,12 +435,8 @@ mod tests {
         // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
         // to zero polynomials.
         composer.add_dummy_constraints();
-
-        let prep_circ = composer.preprocess(
-            &ck,
-            &mut transcript,
-            &EvaluationDomain::new(composer.circuit_size()).unwrap(),
-        );
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(270).unwrap());
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
         // This should pass since the range_proof holds.
@@ -467,11 +463,8 @@ mod tests {
         // to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ = composer.preprocess(
-            &ck,
-            &mut transcript,
-            &EvaluationDomain::new(composer.circuit_size()).unwrap(),
-        );
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(270).unwrap());
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
         // This should pass since the range_proof doesn't hold and we constrained the
@@ -504,12 +497,8 @@ mod tests {
         // to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ = composer.preprocess(
-            &ck,
-            &mut transcript,
-            &EvaluationDomain::new(composer.circuit_size()).unwrap(),
-        );
-
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(1099).unwrap());
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
         assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
     }
@@ -544,11 +533,8 @@ mod tests {
         // to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ = composer.preprocess(
-            &ck,
-            &mut transcript,
-            &EvaluationDomain::new(composer.circuit_size()).unwrap(),
-        );
+        let prep_circ =
+            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(1099).unwrap());
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
         assert!(!proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
