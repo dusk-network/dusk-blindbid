@@ -13,9 +13,8 @@ use std::convert::TryInto;
 /// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
 /// and collapsing it into a `StorageScalar` which can be then stored inside of a
 /// `kelvin` tree data structure.
-impl TryInto<StorageScalar> for &Bid {
-    type Error = Error;
-    fn try_into(self) -> Result<StorageScalar, Error> {
+impl Into<StorageScalar> for &Bid {
+    fn into(self) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the representation
         // of all of the `Bid` elements that a.
         let mut words_deposit = Vec::new();
@@ -38,13 +37,7 @@ impl TryInto<StorageScalar> for &Bid {
         words_deposit.push(self.consensus_round_seed);
         words_deposit.push(self.latest_consensus_round);
         words_deposit.push(self.latest_consensus_step);
-        if self.prover_id == None {
-            return Err(BidError::MissingBidFields.into());
-        };
         words_deposit.push(self.prover_id.unwrap());
-        if self.score == None {
-            return Err(BidError::MissingBidFields.into());
-        }
         words_deposit.push(self.score.unwrap().score);
         // Wrap up JubJubScalar bytes into BlsScalar bytes for value and randomness terms
         words_deposit.push(Scalar::from_bytes(&self.value.to_bytes()).unwrap());
@@ -57,7 +50,7 @@ impl TryInto<StorageScalar> for &Bid {
         // Once all of the words are translated as `Scalar` and stored correctly,
         // apply the Poseidon sponge hash function to obtain the encoded form of the
         // `Bid`.
-        Ok(StorageScalar(sponge_hash(&words_deposit)))
+        StorageScalar(sponge_hash(&words_deposit))
     }
 }
 
