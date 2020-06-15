@@ -16,7 +16,7 @@ use std::convert::TryInto;
 impl Into<StorageScalar> for &Bid {
     fn into(self) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the representation
-        // of all of the `Bid` elements that a.
+        // of all of the `Bid` elements.
         let mut words_deposit = Vec::new();
         // Note that the merkle_tree_root is not used since we can't pre-compute
         // it. Therefore, any field that relies on it to be computed isn't neither
@@ -37,8 +37,8 @@ impl Into<StorageScalar> for &Bid {
         words_deposit.push(self.consensus_round_seed);
         words_deposit.push(self.latest_consensus_round);
         words_deposit.push(self.latest_consensus_step);
-        words_deposit.push(self.prover_id.unwrap());
-        words_deposit.push(self.score.unwrap().score);
+        words_deposit.push(self.prover_id);
+        words_deposit.push(self.score.score);
         // Wrap up JubJubScalar bytes into BlsScalar bytes for value and randomness terms
         words_deposit.push(Scalar::from_bytes(&self.value.to_bytes()).unwrap());
         words_deposit.push(Scalar::from_bytes(&self.randomness.to_bytes()).unwrap());

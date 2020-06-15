@@ -28,9 +28,9 @@ pub struct Bid {
     // Public Outputs
     //
     // i (One time identity of the prover)
-    pub(crate) prover_id: Option<Scalar>,
+    pub(crate) prover_id: Scalar,
     // q (Score of the bid)
-    pub(crate) score: Option<Score>,
+    pub(crate) score: Score,
     //
     // Private Inputs
     //
@@ -61,8 +61,8 @@ impl Bid {
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
-            prover_id: None,
-            score: None,
+            prover_id: Scalar::default(),
+            score: Score::default(),
             value: bid_value,
             randomness: bid_randomness,
             secret_k,
@@ -71,7 +71,7 @@ impl Bid {
         // Compute and add to the Bid the `prover_id`.
         bid.generate_prover_id();
         // Compute score and append it to the Bid.
-        bid.score = Some(compute_score(&bid)?);
+        bid.score = compute_score(&bid)?;
 
         Ok(bid)
     }
@@ -81,12 +81,12 @@ impl Bid {
     /// The function performs the sponge_hash techniqe using poseidon to
     /// get the one-time prover_id and sets it in the Bid.
     pub(crate) fn generate_prover_id(&mut self) {
-        self.prover_id = Some(sponge_hash(&[
+        self.prover_id = sponge_hash(&[
             Scalar::from_bytes(&self.secret_k.to_bytes()).unwrap(),
             self.consensus_round_seed,
             self.latest_consensus_round,
             self.latest_consensus_step,
-        ]));
+        ]);
     }
 
     pub fn prove_score_generation(&self, composer: &mut StandardComposer) -> Result<Proof, Error> {

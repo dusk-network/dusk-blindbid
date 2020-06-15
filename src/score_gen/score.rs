@@ -78,14 +78,10 @@ pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
 /// Proves that a `Score` is correctly generated.
 /// Prints the proving statements in the passed Constraint System.
 pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) -> Result<(), Error> {
-    // Get score from the bid and err if it is not computed.
-    if bid.score.is_none() {
-        return Err(BidError::MissingBidFields.into());
-    };
     // This unwrap is safe since the order of the JubJubScalar is shorter.
     let bid_value = composer.add_input(Scalar::from_bytes(&bid.value.to_bytes()).unwrap());
     // Safe to unwrap here.
-    let score = bid.score.unwrap();
+    let score = bid.score;
     let r1 = composer.add_input(score.r1);
     let r2 = composer.add_input(score.r2);
     let y = composer.add_input(score.y);
@@ -155,7 +151,7 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
             // Safe to unwrap here.
             z = composer.add_input(u.invert().unwrap());
         }
-        // We can safely unwrap `u` now.
+        // We can safely unwrap `u` now since we know that the inverse for `u` exists.
         // Now we need to check the following to ensure we can provide a boolean
         // result representing wether the rangeproof holds or not:
         // `u = Chi(x)`.
@@ -230,8 +226,7 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
     );
 
     // 3. r2 < Y' we need a 128-bit range_proof
-    let should_be_1 =
-        single_complex_range_proof(composer, bid.score.unwrap().r2, bid.score.unwrap().y_prime)?;
+    let should_be_1 = single_complex_range_proof(composer, bid.score.r2, bid.score.y_prime)?;
     // Check that the result of the range_proof is indeed 0 to assert it passed.
     composer.constrain_to_constant(should_be_1, Scalar::one(), Scalar::zero());
 
@@ -524,10 +519,10 @@ mod tests {
         )
         .unwrap();
         // Edit score fields
-        let mut score = bid.score.unwrap();
+        let mut score = bid.score;
         score.score = Scalar::from(5686536568u64);
         score.r1 = Scalar::from(5898956968u64);
-        bid.score = Some(score);
+        bid.score = score;
         prove_correct_score_gadget(&mut composer, &bid).unwrap();
         // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
         // to zero polynomials.
