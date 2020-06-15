@@ -1,7 +1,6 @@
 //! Score generation
 
 use super::errors::ScoreError;
-use crate::bid::errors::BidError;
 use crate::bid::Bid;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};

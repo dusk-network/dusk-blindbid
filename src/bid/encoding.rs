@@ -2,13 +2,10 @@
 //!
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
-use super::errors::BidError;
 use super::Bid;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
-use failure::Error;
 use poseidon252::{sponge::sponge::*, StorageScalar};
-use std::convert::TryInto;
 
 /// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
 /// and collapsing it into a `StorageScalar` which can be then stored inside of a
