@@ -401,6 +401,7 @@ mod tests {
     use dusk_plonk::fft::EvaluationDomain;
     use jubjub::{AffinePoint, Fr as JubJubScalar};
     use merlin::Transcript;
+    use rand_core::RngCore;
 
     #[test]
     fn biguint_scalar_conversion() {
@@ -480,8 +481,8 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
+            rand::thread_rng().next_u32(),
+            rand::thread_rng().next_u32(),
             JubJubScalar::from(99u64),
             JubJubScalar::from(199u64),
             JubJubScalar::from(6546546u64),
@@ -518,8 +519,8 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
+            rand::thread_rng().next_u32(),
+            rand::thread_rng().next_u32(),
             JubJubScalar::from(99u64),
             JubJubScalar::from(199u64),
             JubJubScalar::from(6546546u64),

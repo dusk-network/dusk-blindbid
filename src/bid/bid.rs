@@ -23,9 +23,9 @@ pub struct Bid {
     // k^s
     pub(crate) latest_consensus_step: Scalar,
     // t_a
-    pub(crate) elegibility_ts: Scalar,
+    pub(crate) elegibility_ts: u32,
     // t_e
-    pub(crate) expiration_ts: Scalar,
+    pub(crate) expiration_ts: u32,
     //
     // Public Outputs
     //
@@ -59,8 +59,8 @@ impl Bid {
         consensus_round_seed: Scalar,
         latest_consensus_round: Scalar,
         latest_consensus_step: Scalar,
-        elegibility_ts: Scalar,
-        expiration_ts: Scalar,
+        elegibility_ts: u32,
+        expiration_ts: u32,
         blinder: JubJubScalar,
         encrypted_blinder: JubJubScalar,
         value: JubJubScalar,
