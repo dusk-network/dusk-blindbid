@@ -14,8 +14,6 @@ use poseidon252::sponge::sponge::sponge_hash;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
-    // Pub Inputs
-    //
     // B^R
     pub(crate) bid_tree_root: Scalar,
     // sigma^s
@@ -24,6 +22,10 @@ pub struct Bid {
     pub(crate) latest_consensus_round: Scalar,
     // k^s
     pub(crate) latest_consensus_step: Scalar,
+    // t_a
+    pub(crate) elegibility_ts: Scalar,
+    // t_e
+    pub(crate) expiration_ts: Scalar,
     //
     // Public Outputs
     //
@@ -31,17 +33,24 @@ pub struct Bid {
     pub(crate) prover_id: Scalar,
     // q (Score of the bid)
     pub(crate) score: Score,
-    //
-    // Private Inputs
-    //
-    // v
+    // b (blinder)
+    pub(crate) blinder: JubJubScalar,
+    // b_enc (encrypted blinder) // XXX: Scalar for now. Double check
+    pub(crate) encrypted_blinder: JubJubScalar,
+    // v (value)
     pub(crate) value: JubJubScalar,
-    // r
-    pub(crate) randomness: JubJubScalar,
+    // v_enc (encrypted_value)
+    pub(crate) encrypted_value: JubJubScalar,
+    // R = r * G
+    pub(crate) randomness: AffinePoint,
     // k
     pub(crate) secret_k: Scalar,
-    // R = r * G
+    // m
+    pub(crate) hashed_secret: Scalar,
+    // pk (Public Key - Stealth Address)
     pub(crate) pk: AffinePoint,
+    // c (Pedersen Commitment)
+    pub(crate) c: AffinePoint,
 }
 
 impl Bid {
