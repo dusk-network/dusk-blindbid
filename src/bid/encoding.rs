@@ -5,7 +5,28 @@
 use super::Bid;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
+use jubjub::{AffinePoint as JubJubAffine, Scalar as JubJubScalar};
 use poseidon252::{sponge::sponge::*, StorageScalar};
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct StorageBid {
+    // t_a
+    pub(crate) elegibility_ts: Scalar,
+    // t_e
+    pub(crate) expiration_ts: Scalar,
+    // b_enc (encrypted blinder) // XXX: Scalar for now. Double check
+    pub(crate) encrypted_blinder: JubJubScalar,
+    // v_enc (encrypted_value)
+    pub(crate) encrypted_value: JubJubScalar,
+    // R = r * G
+    pub(crate) randomness: JubJubAffine,
+    // m
+    pub(crate) hashed_secret: Scalar,
+    // pk (Public Key - Stealth Address)
+    pub(crate) pk: JubJubAffine,
+    // c (Pedersen Commitment)
+    pub(crate) c: JubJubAffine,
+}
 
 /// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
 /// and collapsing it into a `StorageScalar` which can be then stored inside of a
