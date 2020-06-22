@@ -112,10 +112,12 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         composer,
         score.r1,
         biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
+        two_pow_128,
     )?;
 
     // 2.2. Then we have a single Rangeproof between Y' being in the range [0-2^128]
-    let second_cond = single_complex_range_proof(composer, score.y_prime, two_pow_128)?;
+    let second_cond =
+        single_complex_range_proof(composer, score.y_prime, two_pow_128, two_pow_128)?;
     // 2.3. Third, we have an equalty checking between r1 & the order of the Scalar field divided (no modular division)
     // by 2^128.
     // We simply subtract both values and if it's equal, we will get a 0.
@@ -189,6 +191,7 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         composer,
         score.y_prime,
         biguint_to_scalar(minus_one_mod_2_pow_128)?,
+        two_pow_128,
     )?;
     // Apply the point 2 constraint.
     //(r1 < |Fr|/2^128 AND Y' < 2^128 +1)
@@ -225,7 +228,8 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
     );
 
     // 3. r2 < Y' we need a 128-bit range_proof
-    let should_be_1 = single_complex_range_proof(composer, bid.score.r2, bid.score.y_prime)?;
+    let should_be_1 =
+        single_complex_range_proof(composer, bid.score.r2, bid.score.y_prime, two_pow_128)?;
     // Check that the result of the range_proof is indeed 0 to assert it passed.
     composer.constrain_to_constant(should_be_1, Scalar::one(), Scalar::zero());
 
@@ -269,11 +273,10 @@ fn single_complex_range_proof(
     composer: &mut StandardComposer,
     witness: Scalar,
     max_range: Scalar,
+    closest_pow_of_two: Scalar,
 ) -> Result<Variable, Error> {
-    // The closest pow of two for Y' is 2^128
-    let two_pow_128 = Scalar::from(2u64).pow(&[128u64, 0, 0, 0]);
     // Compute b' max range.
-    let b_prime = two_pow_128 - max_range;
+    let b_prime = closest_pow_of_two - max_range;
     // Obtain 128-bit representation of `witness + b'`.
     let bits = scalar_to_bits(&(witness + b_prime));
 
@@ -425,6 +428,7 @@ mod tests {
             &mut composer,
             Scalar::from(2u64).pow(&[127u64, 0, 0, 0]),
             Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
+            Scalar::from(2u64).pow(&[128u64, 0, 0, 0]),
         )
         .unwrap();
         // Constraint res to be true, since the range should hold.
@@ -452,6 +456,7 @@ mod tests {
             &mut composer,
             Scalar::from(2u64).pow(&[130u64, 0, 0, 0]),
             Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
+            Scalar::from(2u64).pow(&[128u64, 0, 0, 0]),
         )
         .unwrap();
         // Constraint res to be false, since the range should not hold.
