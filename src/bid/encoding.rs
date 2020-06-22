@@ -11,9 +11,9 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 #[derive(Copy, Clone, Debug, Default)]
 pub struct StorageBid {
     // t_a
-    pub(crate) elegibility_ts: Scalar,
+    pub(crate) elegibility_ts: u32,
     // t_e
-    pub(crate) expiration_ts: Scalar,
+    pub(crate) expiration_ts: u32,
     // b_enc (encrypted blinder) // XXX: Scalar for now. Double check
     pub(crate) encrypted_blinder: JubJubScalar,
     // v_enc (encrypted_value)
@@ -28,10 +28,27 @@ pub struct StorageBid {
     pub(crate) c: JubJubAffine,
 }
 
+
 /// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
+impl From<&Bid> for StorageBid {
+    fn from(bid: &Bid) -> StorageBid {
+        StorageBid {
+            elegibility_ts: bid.elegibility_ts,
+            expiration_ts: bid.expiration_ts,
+            encrypted_blinder: bid.encrypted_blinder,
+            encrypted_value: bid.encrypted_value,
+            randomness: bid.randomness,
+            hashed_secret: bid.hashed_secret,
+            pk: bid.pk,
+            c: bid.c,
+        }
+    }
+}
+
+/// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct encoding methods
 /// and collapsing it into a `StorageScalar` which can be then stored inside of a
 /// `kelvin` tree data structure.
-impl Into<StorageScalar> for &Bid {
+impl Into<StorageScalar> for &StorageBid {
     fn into(self) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the representation
         // of all of the `Bid` elements.
@@ -44,26 +61,33 @@ impl Into<StorageScalar> for &Bid {
         // Type 1 will be BlsScalar
         // Type 2 will be JubJubScalar
         // Type 3 will be JubJubAffine
-        // Treated in Little Endian.
+        // Type 4 will be u32
+        // Byte-types are treated in Little Endian.
 
         // Safe unwrap here.
-        let type_fields = Scalar::from_bytes(b"11111122130000000000000000000000").unwrap();
+        let type_fields = Scalar::from_bytes(b"44223133000000000000000000000000").unwrap();
         words_deposit.push(type_fields);
 
         // 2. Encode each word.
         // Scalar and any other type that can be embedded in, will also be treated as one.
-        words_deposit.push(self.consensus_round_seed);
-        words_deposit.push(self.latest_consensus_round);
-        words_deposit.push(self.latest_consensus_step);
-        words_deposit.push(self.prover_id);
-        words_deposit.push(self.score.score);
-        // Wrap up JubJubScalar bytes into BlsScalar bytes for value and randomness terms
-        words_deposit.push(Scalar::from_bytes(&self.value.to_bytes()).unwrap());
-        words_deposit.push(Scalar::from_bytes(&self.randomness.to_bytes()).unwrap());
-        words_deposit.push(self.secret_k);
+        words_deposit.push(Scalar::from(self.elegibility_ts as u64));
+        words_deposit.push(Scalar::from(self.expiration_ts as u64));
+        // Unwraping a conversion between JubJubScalar to BlsScalar is always safe since the order of
+        // the JubJubScalar field is shorter than the BlsScalar one.
+        words_deposit.push(Scalar::from_bytes(&self.encrypted_blinder.to_bytes()).unwrap());
+        words_deposit.push(Scalar::from_bytes(&self.encrypted_value.to_bytes()).unwrap());
+        // Push both JubJubAffine coordinates as a Scalar.
+        words_deposit.push(Scalar::from_bytes(&self.randomness.get_x().to_bytes()).unwrap());
+        words_deposit.push(Scalar::from_bytes(&self.randomness.get_y().to_bytes()).unwrap());
+
+        words_deposit.push(self.hashed_secret);
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(Scalar::from_bytes(&self.pk.get_x().to_bytes()).unwrap());
         words_deposit.push(Scalar::from_bytes(&self.pk.get_y().to_bytes()).unwrap());
+
+        // Push both JubJubAffine coordinates as a Scalar.
+        words_deposit.push(Scalar::from_bytes(&self.c.get_x().to_bytes()).unwrap());
+        words_deposit.push(Scalar::from_bytes(&self.c.get_y().to_bytes()).unwrap());
 
         // Once all of the words are translated as `Scalar` and stored correctly,
         // apply the Poseidon sponge hash function to obtain the encoded form of the

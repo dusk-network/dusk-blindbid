@@ -278,23 +278,25 @@ fn single_complex_range_proof(
     let bits = scalar_to_bits(&(witness + b_prime));
 
     let mut var_accumulator = composer.zero_var;
-    let mut accumulator = Scalar::zero();
 
-    bits[..129].iter().enumerate().for_each(|(idx, bit)| {
-        let bit_var = composer.add_input(Scalar::from(*bit as u64));
-        // Apply boolean constraint to the bit.
-        composer.bool_gate(bit_var);
-        // Accumulate the bit multiplied by 2^(i-1) as a variable
-        var_accumulator = composer.add(
-            (Scalar::one(), var_accumulator),
-            (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
-            Scalar::zero(),
-            Scalar::zero(),
-        );
-        // Compute the same accumulator with scalars
-        accumulator = accumulator
-            + (Scalar::from(*bit as u64) * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]));
-    });
+    let accumulator =
+        bits[..129]
+            .iter()
+            .enumerate()
+            .fold(Scalar::zero(), |scalar_accum, (idx, bit)| {
+                let bit_var = composer.add_input(Scalar::from(*bit as u64));
+                // Apply boolean constraint to the bit.
+                composer.bool_gate(bit_var);
+                // Accumulate the bit multiplied by 2^(i-1) as a variable
+                var_accumulator = composer.add(
+                    (Scalar::one(), var_accumulator),
+                    (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
+                    Scalar::zero(),
+                    Scalar::zero(),
+                );
+                scalar_accum
+                    + (Scalar::from(*bit as u64) * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]))
+            });
     // Compute `Chi(x)` =  Sum(vi * 2^(i-1)) - (x + b').
     let witness_plus_b_prime = composer.add_input(witness + b_prime);
     // Note that the result will be equal to: `0 (if the reangeproof holds)
@@ -401,6 +403,7 @@ mod tests {
     use dusk_plonk::fft::EvaluationDomain;
     use jubjub::{AffinePoint, Fr as JubJubScalar};
     use merlin::Transcript;
+    use rand_core::RngCore;
 
     #[test]
     fn biguint_scalar_conversion() {
@@ -480,8 +483,8 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
+            rand::thread_rng().next_u32(),
+            rand::thread_rng().next_u32(),
             JubJubScalar::from(99u64),
             JubJubScalar::from(199u64),
             JubJubScalar::from(6546546u64),
@@ -518,8 +521,8 @@ mod tests {
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
             Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
+            rand::thread_rng().next_u32(),
+            rand::thread_rng().next_u32(),
             JubJubScalar::from(99u64),
             JubJubScalar::from(199u64),
             JubJubScalar::from(6546546u64),

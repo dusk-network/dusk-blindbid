@@ -19,3 +19,4 @@ num-traits = "0.2.11"
 [dev-dependencies]
 merlin = "2.0.0"
 rand = "0.7.3"
+rand_core = "0.5.1"
