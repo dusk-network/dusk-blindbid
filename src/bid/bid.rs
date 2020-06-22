@@ -18,7 +18,7 @@ pub struct Bid {
     pub(crate) bid_tree_root: Scalar,
     // sigma^s
     pub(crate) consensus_round_seed: Scalar,
-    // k^r
+    // k^t
     pub(crate) latest_consensus_round: Scalar,
     // k^s
     pub(crate) latest_consensus_step: Scalar,
@@ -99,7 +99,7 @@ impl Bid {
         Ok(bid)
     }
 
-    /// One-time prover-id is stated to be H(secret_k, sigma^s, k^t, k^s).
+    /// One-time prover-id is stated to be `H(secret_k, sigma^s, k^t, k^s)`.
     ///
     /// The function performs the sponge_hash techniqe using poseidon to
     /// get the one-time prover_id and sets it in the Bid.
