@@ -28,6 +28,8 @@ pub struct StorageBid {
     pub(crate) c: JubJubAffine,
 }
 
+
+/// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
 impl From<&Bid> for StorageBid {
     fn from(bid: &Bid) -> StorageBid {
         StorageBid {
