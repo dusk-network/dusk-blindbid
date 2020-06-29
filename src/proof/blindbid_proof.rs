@@ -18,7 +18,7 @@ pub fn blind_bid_proof(
 ) -> Result<(), Error> {
     // Get the corresponding `StorageBid` value that for the `Bid`
     // which is effectively the value of the proven leaf.
-    let storage_bid: StorageBid = StorageBid::from(bid).into();
+    let storage_bid: StorageBid = StorageBid::from(bid);
     let encoded_bid: StorageScalar = storage_bid.into();
     let proven_leaf = composer.add_input(encoded_bid.into());
     // 1. Merkle Opening
@@ -46,14 +46,14 @@ pub fn blind_bid_proof(
     // 0 < v -> XXX: Needs review
     single_complex_range_proof(
         composer,
-        Scalar::from(crate::v_min),
+        Scalar::from(crate::V_MIN),
         Scalar::from_bytes(&bid.value.to_bytes()).unwrap(),
     )?;
     // v <= v_max
     single_complex_range_proof(
         composer,
         Scalar::from_bytes(&bid.value.to_bytes()).unwrap(),
-        Scalar::from(crate::v_max),
+        Scalar::from(crate::V_MAX),
     )?;
 
     // 7. 0 < value <= 2^64 range check
@@ -126,7 +126,7 @@ mod tests {
             AffinePoint::identity(),
             AffinePoint::identity(),
         )
-        .unwrap();
+        .expect("Bid creation should not fail independently of the parameters send");
         // Append the StorageBid as an StorageScalar to the tree.
         tree.push(StorageBid::from(&bid).into()).unwrap();
 
@@ -134,7 +134,6 @@ mod tests {
         let branch = tree.poseidon_branch(0u64).unwrap().unwrap();
 
         blind_bid_proof(&mut composer, &bid, &branch).unwrap();
-        println!("{:?}", composer.circuit_size());
         let prep_circ = composer.preprocess(
             &ck,
             &mut transcript,
