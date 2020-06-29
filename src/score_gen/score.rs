@@ -270,7 +270,7 @@ pub(crate) fn single_complex_range_proof(
     witness: Scalar,
     max_range: Scalar,
 ) -> Result<Variable, Error> {
-    let log = log_2_roudup(max_range);
+    let log = next_pow_2_bitnum(max_range);
     let closest_pow_of_two = Scalar::from(2u64).pow(&[log, 0, 0, 0]);
     // Compute b' max range.
     let b_prime = closest_pow_of_two - max_range;
@@ -395,7 +395,7 @@ fn scalar_to_bits(scalar: &Scalar) -> [u8; 256] {
     res
 }
 
-fn log_2_roudup(mut scalar: Scalar) -> u64 {
+fn next_pow_2_bitnum(mut scalar: Scalar) -> u64 {
     scalar = scalar.reduce();
     let mut counter = 0u64;
     while scalar > Scalar::one().reduce() {
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn log_2_rounded() {
         let two_pow_128 = Scalar::from(2u64).pow(&[128u64, 0, 0, 0]);
-        assert_eq!(log_2_roudup(two_pow_128), 129u64);
+        assert_eq!(next_pow_2_bitnum(two_pow_128), 129u64);
     }
 
     #[test]

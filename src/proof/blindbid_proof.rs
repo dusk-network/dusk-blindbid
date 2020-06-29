@@ -10,6 +10,7 @@ use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch, StorageScalar,
 };
 
+/// Generates the proof of BlindBid
 pub fn blind_bid_proof(
     composer: &mut StandardComposer,
     bid: &Bid,
@@ -27,14 +28,14 @@ pub fn blind_bid_proof(
     // 3. k_t <= t_a range check XXX: Needs review!
     single_complex_range_proof(
         composer,
-        Scalar::from(bid.elegibility_ts as u64),
+        Scalar::from(storage_bid.elegibility_ts as u64),
         bid.latest_consensus_step,
     )?;
 
     // 4. t_e <= k_t
     single_complex_range_proof(
         composer,
-        Scalar::from(bid.expiration_ts as u64),
+        Scalar::from(storage_bid.expiration_ts as u64),
         bid.latest_consensus_step,
     )?;
 
