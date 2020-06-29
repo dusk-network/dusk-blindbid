@@ -8,6 +8,17 @@ use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use jubjub::{AffinePoint as JubJubAffine, Scalar as JubJubScalar};
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
+// XXX: This should be moved to bls12_381 or jubjub lib.
+pub(self) fn jubjub_scalar_to_bls12_381(jubjub_scalar: JubJubScalar) -> Scalar {
+    let bytes = jubjub_scalar.to_bytes();
+    if bool::from(Scalar::from_bytes(&bytes).is_none()) == true {
+        panic!("Failed to convert a Scalar from JubJub to BLS Scalar field. Unexpected behaviour");
+    } else {
+        // Now it's safe to unwrap since we already know that the Choice will be correct.
+        return Scalar::from_bytes(&bytes).unwrap();
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default)]
 pub struct StorageBid {
     // t_a
@@ -72,20 +83,20 @@ impl Into<StorageScalar> for StorageBid {
         words_deposit.push(Scalar::from(self.expiration_ts as u64));
         // Unwraping a conversion between JubJubScalar to BlsScalar is always safe since the order of
         // the JubJubScalar field is shorter than the BlsScalar one.
-        words_deposit.push(Scalar::from_bytes(&self.encrypted_blinder.to_bytes()).unwrap());
-        words_deposit.push(Scalar::from_bytes(&self.encrypted_value.to_bytes()).unwrap());
+        words_deposit.push(jubjub_scalar_to_bls12_381(self.encrypted_blinder));
+        words_deposit.push(jubjub_scalar_to_bls12_381(self.encrypted_value));
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(Scalar::from_bytes(&self.randomness.get_x().to_bytes()).unwrap());
-        words_deposit.push(Scalar::from_bytes(&self.randomness.get_y().to_bytes()).unwrap());
+        words_deposit.push(self.randomness.get_x());
+        words_deposit.push(self.randomness.get_y());
 
         words_deposit.push(self.hashed_secret);
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(Scalar::from_bytes(&self.pk.get_x().to_bytes()).unwrap());
-        words_deposit.push(Scalar::from_bytes(&self.pk.get_y().to_bytes()).unwrap());
+        words_deposit.push(self.pk.get_x());
+        words_deposit.push(self.pk.get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(Scalar::from_bytes(&self.c.get_x().to_bytes()).unwrap());
-        words_deposit.push(Scalar::from_bytes(&self.c.get_y().to_bytes()).unwrap());
+        words_deposit.push(self.c.get_x());
+        words_deposit.push(self.c.get_y());
 
         // Once all of the words are translated as `Scalar` and stored correctly,
         // apply the Poseidon sponge hash function to obtain the encoded form of the
@@ -104,29 +115,22 @@ impl StorageBid {
     pub(crate) fn preimage_gadget(&self, composer: &mut StandardComposer) -> Variable {
         // This field represents the types of the inputs and has to be the same as the
         // default one.
+        // It has been already checked that it's safe to unwrap here since the value fits correctly in a `Scalar`.
         let type_fields = Scalar::from_bytes(b"44223133000000000000000000000000").unwrap();
         // Add to the composer the values required for the preimage.
         let mut messages: Vec<Variable> = vec![];
         messages.push(composer.add_input(type_fields));
         messages.push(composer.add_input(Scalar::from(self.elegibility_ts as u64)));
         messages.push(composer.add_input(Scalar::from(self.expiration_ts as u64)));
-        messages.push(
-            composer.add_input(Scalar::from_bytes(&self.encrypted_blinder.to_bytes()).unwrap()),
-        );
-        messages.push(
-            composer.add_input(Scalar::from_bytes(&self.encrypted_value.to_bytes()).unwrap()),
-        );
-        messages.push(
-            composer.add_input(Scalar::from_bytes(&self.randomness.get_x().to_bytes()).unwrap()),
-        );
-        messages.push(
-            composer.add_input(Scalar::from_bytes(&self.randomness.get_y().to_bytes()).unwrap()),
-        );
+        messages.push(composer.add_input(jubjub_scalar_to_bls12_381(self.encrypted_blinder)));
+        messages.push(composer.add_input(jubjub_scalar_to_bls12_381(self.encrypted_value)));
+        messages.push(composer.add_input(self.randomness.get_x()));
+        messages.push(composer.add_input(self.randomness.get_y()));
         messages.push(composer.add_input(self.hashed_secret));
-        messages.push(composer.add_input(Scalar::from_bytes(&self.pk.get_x().to_bytes()).unwrap()));
-        messages.push(composer.add_input(Scalar::from_bytes(&self.pk.get_y().to_bytes()).unwrap()));
-        messages.push(composer.add_input(Scalar::from_bytes(&self.c.get_x().to_bytes()).unwrap()));
-        messages.push(composer.add_input(Scalar::from_bytes(&self.c.get_y().to_bytes()).unwrap()));
+        messages.push(composer.add_input(self.pk.get_x()));
+        messages.push(composer.add_input(self.pk.get_y()));
+        messages.push(composer.add_input(self.c.get_x()));
+        messages.push(composer.add_input(self.c.get_y()));
 
         // Perform the sponge_hash inside of the Constraint System
         let storage_bid_hash = sponge_hash_gadget(composer, &messages);
