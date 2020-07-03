@@ -2,6 +2,7 @@
 
 use super::errors::ScoreError;
 use crate::bid::Bid;
+use crate::jubjub_scalar_to_bls12_381;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use failure::Error;
@@ -19,7 +20,13 @@ pub struct Score {
 }
 
 impl Score {
-    pub(crate) fn new(score: Scalar, y: Scalar, y_prime: Scalar, r1: Scalar, r2: Scalar) -> Self {
+    pub(crate) fn new(
+        score: Scalar,
+        y: Scalar,
+        y_prime: Scalar,
+        r1: Scalar,
+        r2: Scalar,
+    ) -> Self {
         Score {
             score,
             y,
@@ -32,7 +39,8 @@ impl Score {
 
 /// Given a `Bid`, compute it's Score and return it.
 pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
-    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed, latest_consensus_round, latest_consensus_step)`.
+    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
+    // latest_consensus_round, latest_consensus_step)`.
     let y = sponge::sponge_hash(&[
         bid.secret_k,
         bid.bid_tree_root,
@@ -63,8 +71,8 @@ pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
         true => (bid_value * (BigUint::one() << 128), BigUint::zero()),
     };
 
-    // Get Scalars from the bigUints and return a `Score` if the conversions could
-    // be correctly done.
+    // Get Scalars from the bigUints and return a `Score` if the conversions
+    // could be correctly done.
     Ok(Score::new(
         biguint_to_scalar(f)?,
         y,
@@ -76,9 +84,12 @@ pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
 
 /// Proves that a `Score` is correctly generated.
 /// Prints the proving statements in the passed Constraint System.
-pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) -> Result<(), Error> {
+pub fn prove_correct_score_gadget(
+    composer: &mut StandardComposer,
+    bid: &Bid,
+) -> Result<(), Error> {
     // This unwrap is safe since the order of the JubJubScalar is shorter.
-    let bid_value = composer.add_input(Scalar::from_bytes(&bid.value.to_bytes()).unwrap());
+    let bid_value = composer.add_input(jubjub_scalar_to_bls12_381(bid.value));
     // Safe to unwrap here.
     let score = bid.score;
     let r1 = composer.add_input(score.r1);
@@ -99,13 +110,16 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         Scalar::zero(),
         Scalar::zero(),
     );
-    // 2.(r1 < |Fr|/2^128 AND Y' < 2^128) OR (r1 = |Fr|/2^128 AND Y' < |Fr| mod 2^128).
+    // 2.(r1 < |Fr|/2^128 AND Y' < 2^128) OR (r1 = |Fr|/2^128 AND Y' < |Fr| mod
+    // 2^128).
     //
-    // 2.1. First op will be a complex rangeproof between r1 and the range (Order of the Scalar Field / 2^128 (No modular division))
-    // The result should be 0 if the rangeproof holds.
+    // 2.1. First op will be a complex rangeproof between r1 and the range
+    // (Order of the Scalar Field / 2^128 (No modular division)) The result
+    // should be 0 if the rangeproof holds.
     let scalar_field_ord_div_2_pow_128 = {
         let scalar_field_order =
-            BigUint::from_bytes_le(&(-Scalar::one()).to_bytes()) + BigUint::one();
+            BigUint::from_bytes_le(&(-Scalar::one()).to_bytes())
+                + BigUint::one();
         scalar_field_order / &two_pow_128_buint
     };
     let first_cond = single_complex_range_proof(
@@ -114,10 +128,12 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
     )?;
 
-    // 2.2. Then we have a single Rangeproof between Y' being in the range [0-2^128]
-    let second_cond = single_complex_range_proof(composer, score.y_prime, two_pow_128)?;
-    // 2.3. Third, we have an equalty checking between r1 & the order of the Scalar field divided (no modular division)
-    // by 2^128.
+    // 2.2. Then we have a single Rangeproof between Y' being in the range
+    // [0-2^128]
+    let second_cond =
+        single_complex_range_proof(composer, score.y_prime, two_pow_128)?;
+    // 2.3. Third, we have an equalty checking between r1 & the order of the
+    // Scalar field divided (no modular division) by 2^128.
     // We simply subtract both values and if it's equal, we will get a 0.
 
     let one = composer.add_input(Scalar::one());
@@ -150,10 +166,10 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
             // Safe to unwrap here.
             z = composer.add_input(u.invert().unwrap());
         }
-        // We can safely unwrap `u` now since we know that the inverse for `u` exists.
-        // Now we need to check the following to ensure we can provide a boolean
-        // result representing wether the rangeproof holds or not:
-        // `u = Chi(x)`.
+        // We can safely unwrap `u` now since we know that the inverse for `u`
+        // exists. Now we need to check the following to ensure we can
+        // provide a boolean result representing wether the rangeproof
+        // holds or not: `u = Chi(x)`.
         // `u * z = 1 - y`.
         // `y * u = 0`.
         let one = composer.add_input(Scalar::one());
@@ -179,8 +195,8 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         composer.assert_equal(y_times_u, composer.zero_var);
         y
     };
-    // 2.4. Finally, A rangeproof for y' checking it's between [0, Order of the ScalarField mod 2^128]. We will apply the complex
-    // rangeproof too.
+    // 2.4. Finally, A rangeproof for y' checking it's between [0, Order of the
+    // ScalarField mod 2^128]. We will apply the complex rangeproof too.
     let minus_one_mod_2_pow_128 = {
         let min_one = BigUint::from_bytes_le(&(-Scalar::one()).to_bytes());
         min_one % &two_pow_128_buint
@@ -208,11 +224,12 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
         Scalar::zero(),
     );
     // left_assign XOR right_assign = 1
-    // This is possible since condition 1. and 3. are mutually exclusive. That means
-    // that if one is true, the other part of the equation will be false (0).
-    // Therefore, we can apply a mul gate since the inputs are boolean and
-    // both sides of the equal can't be true, but both can be false, and this has to make the proof fail.
-    // The following gate computes the XOR and constraints the result to be equal to one.
+    // This is possible since condition 1. and 3. are mutually exclusive. That
+    // means that if one is true, the other part of the equation will be
+    // false (0). Therefore, we can apply a mul gate since the inputs are
+    // boolean and both sides of the equal can't be true, but both can be
+    // false, and this has to make the proof fail. The following gate
+    // computes the XOR and constraints the result to be equal to one.
     composer.add_gate(
         left_assign,
         right_assign,
@@ -225,7 +242,8 @@ pub fn prove_correct_score_gadget(composer: &mut StandardComposer, bid: &Bid) ->
     );
 
     // 3. r2 < Y' we need a 128-bit range_proof
-    let should_be_1 = single_complex_range_proof(composer, bid.score.r2, bid.score.y_prime)?;
+    let should_be_1 =
+        single_complex_range_proof(composer, bid.score.r2, bid.score.y_prime)?;
     // Check that the result of the range_proof is indeed 0 to assert it passed.
     composer.constrain_to_constant(should_be_1, Scalar::one(), Scalar::zero());
 
@@ -270,8 +288,8 @@ pub(crate) fn single_complex_range_proof(
     witness: Scalar,
     max_range: Scalar,
 ) -> Result<Variable, Error> {
-    let log = next_pow_2_bitnum(max_range);
-    let closest_pow_of_two = Scalar::from(2u64).pow(&[log, 0, 0, 0]);
+    let num_bits = bits_count(max_range);
+    let closest_pow_of_two = Scalar::from(2u64).pow(&[num_bits, 0, 0, 0]);
     // Compute b' max range.
     let b_prime = closest_pow_of_two - max_range;
     // Obtain 128-bit representation of `witness + b'`.
@@ -279,24 +297,24 @@ pub(crate) fn single_complex_range_proof(
 
     let mut var_accumulator = composer.zero_var;
 
-    let accumulator =
-        bits[..log as usize]
-            .iter()
-            .enumerate()
-            .fold(Scalar::zero(), |scalar_accum, (idx, bit)| {
-                let bit_var = composer.add_input(Scalar::from(*bit as u64));
-                // Apply boolean constraint to the bit.
-                composer.bool_gate(bit_var);
-                // Accumulate the bit multiplied by 2^(i-1) as a variable
-                var_accumulator = composer.add(
-                    (Scalar::one(), var_accumulator),
-                    (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
-                    Scalar::zero(),
-                    Scalar::zero(),
-                );
-                scalar_accum
-                    + (Scalar::from(*bit as u64) * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]))
-            });
+    let accumulator = bits[..num_bits as usize].iter().enumerate().fold(
+        Scalar::zero(),
+        |scalar_accum, (idx, bit)| {
+            let bit_var = composer.add_input(Scalar::from(*bit as u64));
+            // Apply boolean constraint to the bit.
+            composer.bool_gate(bit_var);
+            // Accumulate the bit multiplied by 2^(i-1) as a variable
+            var_accumulator = composer.add(
+                (Scalar::one(), var_accumulator),
+                (Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]), bit_var),
+                Scalar::zero(),
+                Scalar::zero(),
+            );
+            scalar_accum
+                + (Scalar::from(*bit as u64)
+                    * Scalar::from(2u64).pow(&[idx as u64, 0, 0, 0]))
+        },
+    );
     // Compute `Chi(x)` =  Sum(vi * 2^(i-1)) - (x + b').
     let witness_plus_b_prime = composer.add_input(witness + b_prime);
     // Note that the result will be equal to: `0 (if the reangeproof holds)
@@ -307,9 +325,9 @@ pub(crate) fn single_complex_range_proof(
         Scalar::zero(),
         Scalar::zero(),
     );
-    // It is possible to replace a constraint $\chi(\mathbf{x})=0$ on variables $\mathbf{x}$
-    // with a set of constraints $\psi$ on  new variables $(u,y,z)$ such
-    // that $y=1$ if $\chi$ holds and $y=0$ otherwise.
+    // It is possible to replace a constraint $\chi(\mathbf{x})=0$ on variables
+    // $\mathbf{x}$ with a set of constraints $\psi$ on  new variables
+    // $(u,y,z)$ such that $y=1$ if $\chi$ holds and $y=0$ otherwise.
     // We introduce new variables $u,y,z$ that are computed as follows:
     //
     // u &= \chi(\mathbf{x});\\
@@ -379,7 +397,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<Scalar, Error> {
     if biguint_bytes.len() > 32 {
         return Err(ScoreError::InvalidScoreFieldsLen.into());
     };
-    bytes[0..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
+    bytes[..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
     // Due to the previous conditions, we can unwrap here safely.
     Ok(Scalar::from_bytes(&bytes).unwrap())
 }
@@ -395,14 +413,14 @@ fn scalar_to_bits(scalar: &Scalar) -> [u8; 256] {
     res
 }
 
-fn next_pow_2_bitnum(mut scalar: Scalar) -> u64 {
+fn bits_count(mut scalar: Scalar) -> u64 {
     scalar = scalar.reduce();
-    let mut counter = 0u64;
+    let mut counter = 1u64;
     while scalar > Scalar::one().reduce() {
         scalar.divn(1);
-        counter += 1u64;
+        counter += 1;
     }
-    counter + 1u64
+    counter
 }
 
 #[cfg(test)]
@@ -416,9 +434,12 @@ mod tests {
     use rand_core::RngCore;
 
     #[test]
-    fn log_2_rounded() {
+    fn counting_scalar_bits() {
+        assert_eq!(bits_count(Scalar::zero()), 1);
+        assert_eq!(bits_count(Scalar::one()), 1);
+
         let two_pow_128 = Scalar::from(2u64).pow(&[128u64, 0, 0, 0]);
-        assert_eq!(next_pow_2_bitnum(two_pow_128), 129u64);
+        assert_eq!(bits_count(two_pow_128), 129);
     }
 
     #[test]
@@ -430,10 +451,11 @@ mod tests {
     }
 
     #[test]
-    fn correct_complex_rangeproof() {
+    fn correct_complex_rangeproof() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
-        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+        let pub_params =
+            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 16)?;
         let mut composer = StandardComposer::new();
         let mut transcript = Transcript::new(b"TEST");
 
@@ -441,26 +463,36 @@ mod tests {
             &mut composer,
             Scalar::from(2u64).pow(&[127u64, 0, 0, 0]),
             Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
-        )
-        .unwrap();
+        )?;
         // Constraint res to be true, since the range should hold.
         composer.constrain_to_constant(res, Scalar::one(), Scalar::zero());
-        // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
-        // to zero polynomials.
+        // Since we don't use all of the wires, we set some dummy constraints to
+        // avoid Committing to zero polynomials.
         composer.add_dummy_constraints();
-        let prep_circ =
-            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(270).unwrap());
+        let prep_circ = composer.preprocess(
+            &ck,
+            &mut transcript,
+            &EvaluationDomain::new(270).expect("Evaluation Domain instance"),
+        );
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
         // This should pass since the range_proof holds.
-        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
+        assert!(proof.verify(
+            &prep_circ,
+            &mut transcript,
+            &vk,
+            &composer.public_inputs()
+        ));
+
+        Ok(())
     }
 
     #[test]
-    fn wrong_complex_rangeproof() {
+    fn wrong_complex_rangeproof() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
-        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+        let pub_params =
+            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 16)?;
         let mut composer = StandardComposer::new();
         let mut transcript = Transcript::new(b"TEST");
 
@@ -468,102 +500,139 @@ mod tests {
             &mut composer,
             Scalar::from(2u64).pow(&[130u64, 0, 0, 0]),
             Scalar::from(2u64).pow(&[128u64, 0, 0, 0]) - Scalar::one(),
-        )
-        .unwrap();
+        )?;
         // Constraint res to be false, since the range should not hold.
         composer.constrain_to_constant(res, Scalar::zero(), Scalar::zero());
-        // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
-        // to zero polynomials.
+        // Since we don't use all of the wires, we set some dummy constraints to
+        // avoid Committing to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ =
-            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(270).unwrap());
+        let prep_circ = composer.preprocess(
+            &ck,
+            &mut transcript,
+            &EvaluationDomain::new(270).expect("Evaluation Domain instance"),
+        );
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
-        // This should pass since the range_proof doesn't hold and we constrained the
-        // boolean result of it to be false.
-        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
+        // This should pass since the range_proof doesn't hold and we
+        // constrained the boolean result of it to be false.
+        assert!(proof.verify(
+            &prep_circ,
+            &mut transcript,
+            &vk,
+            &composer.public_inputs()
+        ));
+
+        Ok(())
     }
 
     #[test]
-    fn correct_score_gen_proof() {
+    fn correct_score_gen_proof() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
-        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+        let pub_params =
+            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 16)?;
         let mut composer = StandardComposer::new();
         let mut transcript = Transcript::new(b"TEST");
 
         // Generate a correct Bid
-        let bid = Bid::new(
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            rand::thread_rng().next_u32(),
-            rand::thread_rng().next_u32(),
-            JubJubScalar::from(99u64),
-            JubJubScalar::from(199u64),
-            JubJubScalar::from(6546546u64),
-            JubJubScalar::from(655588855476u64),
-            AffinePoint::identity(),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            AffinePoint::identity(),
-            AffinePoint::identity(),
-        )
-        .unwrap();
-        prove_correct_score_gadget(&mut composer, &bid).unwrap();
-        // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
-        // to zero polynomials.
+        let bid = &Bid {
+            bid_tree_root: Scalar::random(&mut rand::thread_rng()),
+            consensus_round_seed: Scalar::random(&mut rand::thread_rng()),
+            latest_consensus_round: Scalar::random(&mut rand::thread_rng()),
+            latest_consensus_step: Scalar::random(&mut rand::thread_rng()),
+            elegibility_ts: rand::thread_rng().next_u32(),
+            expiration_ts: rand::thread_rng().next_u32(),
+            prover_id: Scalar::default(),
+            score: Score::default(),
+            blinder: JubJubScalar::from(99u64),
+            encrypted_blinder: JubJubScalar::from(199u64),
+            value: JubJubScalar::from(6546546u64),
+            encrypted_value: JubJubScalar::from(655588855476u64),
+            randomness: AffinePoint::identity(),
+            secret_k: Scalar::random(&mut rand::thread_rng()),
+            hashed_secret: Scalar::random(&mut rand::thread_rng()),
+            pk: AffinePoint::identity(),
+            c: AffinePoint::identity(),
+        }
+        .init()?;
+
+        prove_correct_score_gadget(&mut composer, &bid)?;
+        // Since we don't use all of the wires, we set some dummy constraints to
+        // avoid Committing to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ =
-            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(1099).unwrap());
+        let prep_circ = composer.preprocess(
+            &ck,
+            &mut transcript,
+            &EvaluationDomain::new(1099).expect("Evaluation Domain instance"),
+        );
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
-        assert!(proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
+        assert!(proof.verify(
+            &prep_circ,
+            &mut transcript,
+            &vk,
+            &composer.public_inputs()
+        ));
+
+        Ok(())
     }
 
     #[test]
-    fn incorrect_score_gen_proof() {
+    fn incorrect_score_gen_proof() -> Result<(), Error> {
         // Generate Composer & Public Parameters
-        let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng()).unwrap();
-        let (ck, vk) = pub_params.trim(1 << 16).unwrap();
+        let pub_params =
+            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+        let (ck, vk) = pub_params.trim(1 << 16)?;
         let mut composer = StandardComposer::new();
         let mut transcript = Transcript::new(b"TEST");
 
         // Generate a correct Bid
-        let mut bid = Bid::new(
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            rand::thread_rng().next_u32(),
-            rand::thread_rng().next_u32(),
-            JubJubScalar::from(99u64),
-            JubJubScalar::from(199u64),
-            JubJubScalar::from(6546546u64),
-            JubJubScalar::from(655588855476u64),
-            AffinePoint::identity(),
-            Scalar::random(&mut rand::thread_rng()),
-            Scalar::random(&mut rand::thread_rng()),
-            AffinePoint::identity(),
-            AffinePoint::identity(),
-        )
-        .unwrap();
+        let mut bid = Bid {
+            bid_tree_root: Scalar::random(&mut rand::thread_rng()),
+            consensus_round_seed: Scalar::random(&mut rand::thread_rng()),
+            latest_consensus_round: Scalar::random(&mut rand::thread_rng()),
+            latest_consensus_step: Scalar::random(&mut rand::thread_rng()),
+            elegibility_ts: rand::thread_rng().next_u32(),
+            expiration_ts: rand::thread_rng().next_u32(),
+            prover_id: Scalar::default(),
+            score: Score::default(),
+            blinder: JubJubScalar::from(99u64),
+            encrypted_blinder: JubJubScalar::from(199u64),
+            value: JubJubScalar::from(6546546u64),
+            encrypted_value: JubJubScalar::from(655588855476u64),
+            randomness: AffinePoint::identity(),
+            secret_k: Scalar::random(&mut rand::thread_rng()),
+            hashed_secret: Scalar::random(&mut rand::thread_rng()),
+            pk: AffinePoint::identity(),
+            c: AffinePoint::identity(),
+        }
+        .init()?;
+
         // Edit score fields
         let mut score = bid.score;
         score.score = Scalar::from(5686536568u64);
         score.r1 = Scalar::from(5898956968u64);
         bid.score = score;
-        prove_correct_score_gadget(&mut composer, &bid).unwrap();
-        // Since we don't use all of the wires, we set some dummy constraints to avoid Committing
-        // to zero polynomials.
+        prove_correct_score_gadget(&mut composer, &bid)?;
+        // Since we don't use all of the wires, we set some dummy constraints to
+        // avoid Committing to zero polynomials.
         composer.add_dummy_constraints();
 
-        let prep_circ =
-            composer.preprocess(&ck, &mut transcript, &EvaluationDomain::new(1099).unwrap());
+        let prep_circ = composer.preprocess(
+            &ck,
+            &mut transcript,
+            &EvaluationDomain::new(1099).expect("Evaluation Domain instance"),
+        );
 
         let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
-        assert!(!proof.verify(&prep_circ, &mut transcript, &vk, &composer.public_inputs()));
+        assert!(!proof.verify(
+            &prep_circ,
+            &mut transcript,
+            &vk,
+            &composer.public_inputs()
+        ));
+
+        Ok(())
     }
 }
