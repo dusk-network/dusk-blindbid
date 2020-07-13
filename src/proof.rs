@@ -1,7 +1,6 @@
 //! BlindBidProof module.
 
 use crate::bid::{Bid, StorageBid};
-use crate::jubjub_scalar_to_bls12_381;
 use crate::score_gen::*;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::StandardComposer;
@@ -43,7 +42,7 @@ pub fn blind_bid_proof(
     // 5. c = C(v, b) Pedersen Commitment check
     // XXX: Unimplemented until we have ECC gate.
 
-    let bid_value = jubjub_scalar_to_bls12_381(bid.value);
+    let bid_value: Scalar = bid.value.into();
     // 6. v_min < v <= v_max
     // 0 < v -> TODO: Needs review
     single_complex_range_proof(
