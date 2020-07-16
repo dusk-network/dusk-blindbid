@@ -3,7 +3,6 @@
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
-use crate::jubjub_scalar_to_bls12_381;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use jubjub::{AffinePoint as JubJubAffine, Scalar as JubJubScalar};
@@ -29,8 +28,8 @@ pub struct StorageBid {
     pub(crate) c: JubJubAffine,
 }
 
-
-/// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding methods
+/// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding
+/// methods
 impl From<&Bid> for StorageBid {
     fn from(bid: &Bid) -> StorageBid {
         StorageBid {
@@ -78,8 +77,8 @@ impl Into<StorageScalar> for StorageBid {
 
         // A conversion between JubJubScalar to BlsScalar is always safe since
         // the order of a JubJubScalar field is shorter than a BlsScalar one.
-        words_deposit.push(jubjub_scalar_to_bls12_381(self.encrypted_blinder));
-        words_deposit.push(jubjub_scalar_to_bls12_381(self.encrypted_value));
+        words_deposit.push(self.encrypted_blinder.into());
+        words_deposit.push(self.encrypted_value.into());
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.randomness.get_x());
@@ -125,14 +124,8 @@ impl StorageBid {
             .push(composer.add_input(Scalar::from(self.elegibility_ts as u64)));
         messages
             .push(composer.add_input(Scalar::from(self.expiration_ts as u64)));
-        messages.push(
-            composer
-                .add_input(jubjub_scalar_to_bls12_381(self.encrypted_blinder)),
-        );
-        messages.push(
-            composer
-                .add_input(jubjub_scalar_to_bls12_381(self.encrypted_value)),
-        );
+        messages.push(composer.add_input(self.encrypted_blinder.into()));
+        messages.push(composer.add_input(self.encrypted_value.into()));
         messages.push(composer.add_input(self.randomness.get_x()));
         messages.push(composer.add_input(self.randomness.get_y()));
         messages.push(composer.add_input(self.hashed_secret));

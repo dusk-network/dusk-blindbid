@@ -2,7 +2,6 @@
 
 use super::errors::ScoreError;
 use crate::bid::Bid;
-use crate::jubjub_scalar_to_bls12_381;
 use dusk_bls12_381::Scalar;
 use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use failure::Error;
@@ -89,7 +88,7 @@ pub fn prove_correct_score_gadget(
     bid: &Bid,
 ) -> Result<(), Error> {
     // This unwrap is safe since the order of the JubJubScalar is shorter.
-    let bid_value = composer.add_input(jubjub_scalar_to_bls12_381(bid.value));
+    let bid_value = composer.add_input(bid.value.into());
     // Safe to unwrap here.
     let score = bid.score;
     let r1 = composer.add_input(score.r1);
