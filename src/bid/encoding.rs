@@ -3,9 +3,8 @@
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
-use dusk_bls12_381::Scalar;
-use dusk_plonk::constraint_system::{StandardComposer, Variable};
-use jubjub::{AffinePoint as JubJubAffine, Scalar as JubJubScalar};
+use dusk_plonk::jubjub::AffinePoint;
+use dusk_plonk::prelude::*;
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -19,13 +18,13 @@ pub struct StorageBid {
     // v_enc (encrypted_value)
     pub(crate) encrypted_value: JubJubScalar,
     // R = r * G
-    pub(crate) randomness: JubJubAffine,
+    pub(crate) randomness: AffinePoint,
     // m
-    pub(crate) hashed_secret: Scalar,
+    pub(crate) hashed_secret: BlsScalar,
     // pk (Public Key - Stealth Address)
-    pub(crate) pk: JubJubAffine,
+    pub(crate) pk: AffinePoint,
     // c (Pedersen Commitment)
-    pub(crate) c: JubJubAffine,
+    pub(crate) c: AffinePoint,
 }
 
 /// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding
@@ -66,14 +65,14 @@ impl Into<StorageScalar> for StorageBid {
 
         // Safe unwrap here.
         let type_fields =
-            Scalar::from_bytes(b"44223133000000000000000000000000").unwrap();
+            BlsScalar::from_bytes(b"44223133000000000000000000000000").unwrap();
         words_deposit.push(type_fields);
 
         // 2. Encode each word.
         // Scalar and any other type that can be embedded in, will also be
         // treated as one.
-        words_deposit.push(Scalar::from(self.elegibility_ts as u64));
-        words_deposit.push(Scalar::from(self.expiration_ts as u64));
+        words_deposit.push(BlsScalar::from(self.elegibility_ts as u64));
+        words_deposit.push(BlsScalar::from(self.expiration_ts as u64));
 
         // A conversion between JubJubScalar to BlsScalar is always safe since
         // the order of a JubJubScalar field is shorter than a BlsScalar one.
@@ -114,16 +113,18 @@ impl StorageBid {
         // This field represents the types of the inputs and has to be the same
         // as the default one.
         // It has been already checked that it's safe to unwrap here since the
-        // value fits correctly in a `Scalar`.
+        // value fits correctly in a `BlsScalar`.
         let type_fields =
-            Scalar::from_bytes(b"44223133000000000000000000000000").unwrap();
+            BlsScalar::from_bytes(b"44223133000000000000000000000000").unwrap();
         // Add to the composer the values required for the preimage.
         let mut messages: Vec<Variable> = vec![];
         messages.push(composer.add_input(type_fields));
-        messages
-            .push(composer.add_input(Scalar::from(self.elegibility_ts as u64)));
-        messages
-            .push(composer.add_input(Scalar::from(self.expiration_ts as u64)));
+        messages.push(
+            composer.add_input(BlsScalar::from(self.elegibility_ts as u64)),
+        );
+        messages.push(
+            composer.add_input(BlsScalar::from(self.expiration_ts as u64)),
+        );
         messages.push(composer.add_input(self.encrypted_blinder.into()));
         messages.push(composer.add_input(self.encrypted_value.into()));
         messages.push(composer.add_input(self.randomness.get_x()));
@@ -138,12 +139,14 @@ impl StorageBid {
         let storage_bid_hash = sponge_hash_gadget(composer, &messages);
         // Constraint the hash to be equal to the real one
         let real_hash: StorageScalar = self.clone().into();
-        let real_hash: Scalar = real_hash.into();
+        let real_hash: BlsScalar = real_hash.into();
+        let real_hash_var = composer.add_input(real_hash);
         composer.constrain_to_constant(
-            storage_bid_hash,
-            Scalar::zero(),
-            -real_hash,
+            real_hash_var,
+            real_hash,
+            BlsScalar::zero(),
         );
+        composer.assert_equal(real_hash_var, storage_bid_hash);
         storage_bid_hash
     }
 }
@@ -152,11 +155,7 @@ impl StorageBid {
 mod tests {
     use super::*;
     use crate::score_gen::Score;
-    use dusk_plonk::commitment_scheme::kzg10::PublicParameters;
-    use dusk_plonk::fft::EvaluationDomain;
     use failure::Error;
-    use jubjub::{AffinePoint, Scalar as JubJubScalar};
-    use merlin::Transcript;
     use rand_core::RngCore;
 
     #[ignore]
@@ -173,54 +172,48 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
         let mut composer = StandardComposer::new();
-        let mut transcript = Transcript::new(b"TEST");
 
         // Generate a correct Bid
-        let storage_bid = StorageBid::from(
-            &Bid {
-                bid_tree_root: Scalar::random(&mut rand::thread_rng()),
-                consensus_round_seed: Scalar::random(&mut rand::thread_rng()),
-                latest_consensus_round: Scalar::random(&mut rand::thread_rng()),
-                latest_consensus_step: Scalar::random(&mut rand::thread_rng()),
-                elegibility_ts: rand::thread_rng().next_u32(),
-                expiration_ts: rand::thread_rng().next_u32(),
-                prover_id: Scalar::default(),
-                score: Score::default(),
-                blinder: JubJubScalar::from(99u64),
-                encrypted_blinder: JubJubScalar::from(199u64),
-                value: JubJubScalar::from(6546546u64),
-                encrypted_value: JubJubScalar::from(655588855476u64),
-                randomness: AffinePoint::identity(),
-                secret_k: Scalar::random(&mut rand::thread_rng()),
-                hashed_secret: Scalar::random(&mut rand::thread_rng()),
-                pk: AffinePoint::identity(),
-                c: AffinePoint::identity(),
-            }
-            .init()?,
-        );
+        let storage_bid =
+            StorageBid::from(
+                &Bid {
+                    bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
+                    consensus_round_seed: BlsScalar::random(
+                        &mut rand::thread_rng(),
+                    ),
+                    latest_consensus_round: BlsScalar::random(
+                        &mut rand::thread_rng(),
+                    ),
+                    latest_consensus_step: BlsScalar::random(
+                        &mut rand::thread_rng(),
+                    ),
+                    elegibility_ts: rand::thread_rng().next_u32(),
+                    expiration_ts: rand::thread_rng().next_u32(),
+                    prover_id: BlsScalar::default(),
+                    score: Score::default(),
+                    blinder: JubJubScalar::from(99u64),
+                    encrypted_blinder: JubJubScalar::from(199u64),
+                    value: JubJubScalar::from(6546546u64),
+                    encrypted_value: JubJubScalar::from(655588855476u64),
+                    randomness: AffinePoint::identity(),
+                    secret_k: BlsScalar::random(&mut rand::thread_rng()),
+                    hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
+                    pk: AffinePoint::identity(),
+                    c: AffinePoint::identity(),
+                }
+                .init()?,
+            );
 
-        // Apply the preimage_gadget
-        let _ = storage_bid.preimage_gadget(&mut composer);
+        // Proving
+        let mut prover = Prover::new(b"testing");
+        storage_bid.preimage_gadget(prover.mut_cs());
+        prover.preprocess(&ck)?;
+        let proof = prover.prove(&ck)?;
 
-        // Since we don't use all of the wires, we set some dummy constraints to
-        // avoid Committing to zero polynomials.
-        composer.add_dummy_constraints();
-
-        let prep_circ = composer.preprocess(
-            &ck,
-            &mut transcript,
-            &EvaluationDomain::new(composer.circuit_size())
-                .expect("Evaluation Domain instance"),
-        );
-
-        let proof = composer.prove(&ck, &prep_circ, &mut transcript.clone());
-        assert!(proof.verify(
-            &prep_circ,
-            &mut transcript,
-            &vk,
-            &composer.public_inputs()
-        ));
-
-        Ok(())
+        // Verification
+        let mut verifier = Verifier::new(b"testing");
+        storage_bid.preimage_gadget(prover.mut_cs());
+        verifier.preprocess(&ck)?;
+        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
 }

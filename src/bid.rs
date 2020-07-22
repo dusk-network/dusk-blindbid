@@ -1,10 +1,9 @@
 //! Bid data structure
 
 use crate::score_gen::{compute_score, Score};
-use dusk_bls12_381::Scalar;
-use dusk_plonk::{constraint_system::StandardComposer, proof_system::Proof};
+use dusk_plonk::jubjub::AffinePoint;
+use dusk_plonk::prelude::*;
 use failure::Error;
-use jubjub::{AffinePoint, Scalar as JubJubScalar};
 use poseidon252::sponge::sponge::sponge_hash;
 pub(crate) mod encoding;
 pub use encoding::StorageBid;
@@ -12,13 +11,13 @@ pub use encoding::StorageBid;
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
     // B^R
-    pub(crate) bid_tree_root: Scalar,
+    pub(crate) bid_tree_root: BlsScalar,
     // sigma^s
-    pub(crate) consensus_round_seed: Scalar,
+    pub(crate) consensus_round_seed: BlsScalar,
     // k^t
-    pub(crate) latest_consensus_round: Scalar,
+    pub(crate) latest_consensus_round: BlsScalar,
     // k^s
-    pub(crate) latest_consensus_step: Scalar,
+    pub(crate) latest_consensus_step: BlsScalar,
     // t_a
     pub(crate) elegibility_ts: u32,
     // t_e
@@ -27,7 +26,7 @@ pub struct Bid {
     // Public Outputs
     //
     // i (One time identity of the prover)
-    pub(crate) prover_id: Scalar,
+    pub(crate) prover_id: BlsScalar,
     // q (Score of the bid)
     pub(crate) score: Score,
     // b (blinder)
@@ -41,9 +40,9 @@ pub struct Bid {
     // R = r * G
     pub(crate) randomness: AffinePoint,
     // k
-    pub(crate) secret_k: Scalar,
+    pub(crate) secret_k: BlsScalar,
     // m
-    pub(crate) hashed_secret: Scalar,
+    pub(crate) hashed_secret: BlsScalar,
     // pk (Public Key - Stealth Address)
     pub(crate) pk: AffinePoint,
     // c (Pedersen Commitment)
@@ -66,7 +65,7 @@ impl Bid {
     /// get the one-time prover_id and sets it in the Bid.
     pub(crate) fn generate_prover_id(&mut self) {
         self.prover_id = sponge_hash(&[
-            Scalar::from_bytes(&self.secret_k.to_bytes()).unwrap(),
+            BlsScalar::from_bytes(&self.secret_k.to_bytes()).unwrap(),
             self.consensus_round_seed,
             self.latest_consensus_round,
             self.latest_consensus_step,
