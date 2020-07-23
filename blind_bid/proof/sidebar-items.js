@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["blind_bid_proof","Generates the proof of BlindBid"]]});

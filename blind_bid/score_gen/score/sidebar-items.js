@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["prove_correct_score_gadget","Proves that a `Score` is correctly generated. Prints the proving statements in the passed Constraint System."]],"struct":[["Score",""]]});

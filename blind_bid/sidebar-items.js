@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["V_MAX","The maximum amount user is permitted to bid"],["V_MIN","The minimum amount user is permitted to bid"]],"mod":[["bid","Bid data structure"],["proof","BlindBidProof module."],["score_gen",""]]});

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["blind_bid"] = [{"text":"impl&lt;'_&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.From.html\" title=\"trait core::convert::From\">From</a>&lt;&amp;'_ <a class=\"struct\" href=\"blind_bid/bid/struct.Bid.html\" title=\"struct blind_bid::bid::Bid\">Bid</a>&gt; for <a class=\"struct\" href=\"blind_bid/bid/struct.StorageBid.html\" title=\"struct blind_bid::bid::StorageBid\">StorageBid</a>","synthetic":false,"types":["blind_bid::bid::encoding::StorageBid"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
