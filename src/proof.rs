@@ -20,6 +20,7 @@ pub fn blind_bid_proof(
     let storage_bid = StorageBid::from(bid);
     let encoded_bid: StorageScalar = storage_bid.into();
     let proven_leaf = composer.add_input(encoded_bid.into());
+
     // 1. Merkle Opening
     merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
     // 2. Bid pre_image check
@@ -67,12 +68,15 @@ pub fn blind_bid_proof(
     let secret_k = composer.add_input(bid.secret_k);
     let secret_k_hash = sponge_hash_gadget(composer, &[secret_k]);
     // Constraint the secret_k_hash to be equal to the publicly avaliable one.
-    // This will introduce a Public Input to the circuit.
+    // Add the PI as a witness constrained to a constant.
+    let public_secret_k_hash = composer.add_input(sponge_hash(&[bid.secret_k]));
     composer.constrain_to_constant(
-        secret_k_hash,
+        public_secret_k_hash,
+        sponge_hash(&[bid.secret_k]),
         BlsScalar::zero(),
-        -sponge_hash(&[bid.secret_k]),
     );
+    // Constraint the computed secret_k_hash to be equal to the public one.
+    composer.assert_equal(secret_k_hash, public_secret_k_hash);
 
     // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
     let sigma_s = composer.add_input(bid.consensus_round_seed);
@@ -81,12 +85,15 @@ pub fn blind_bid_proof(
     let prover_id =
         sponge_hash_gadget(composer, &[secret_k, sigma_s, k_t, k_s]);
     // Constraint the computed prover_id to the expected & stored one.
-    // This will introduce `prover_id` as a public input for the circuit.
+    // Add the prover_id Pub Input constraining the witness and check that it is equal
+    // to the prover_id computed in the proof.
+    let pub_prover_id = composer.add_input(bid.prover_id);
     composer.constrain_to_constant(
-        prover_id,
+        pub_prover_id,
+        bid.prover_id,
         BlsScalar::zero(),
-        -bid.prover_id,
     );
+    composer.assert_equal(prover_id, pub_prover_id);
 
     // 9. Score generation circuit check with the corresponding gadget.
     prove_correct_score_gadget(composer, bid)?;

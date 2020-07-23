@@ -171,7 +171,6 @@ mod tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
-        let mut composer = StandardComposer::new();
 
         // Generate a correct Bid
         let storage_bid =
@@ -212,7 +211,7 @@ mod tests {
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        storage_bid.preimage_gadget(prover.mut_cs());
+        storage_bid.preimage_gadget(verifier.mut_cs());
         verifier.preprocess(&ck)?;
         verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }

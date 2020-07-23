@@ -136,7 +136,7 @@ pub fn prove_correct_score_gadget(
 
     // Generate fixed&constrained value witnesses.
     let one = composer.add_input(BlsScalar::one());
-    composer.constrain_to_constant(one, BlsScalar::one(), BlsScalar::one());
+    composer.constrain_to_constant(one, BlsScalar::one(), BlsScalar::zero());
     let zero = composer.add_input(BlsScalar::zero());
     composer.constrain_to_constant(zero, BlsScalar::zero(), BlsScalar::zero());
 
@@ -516,10 +516,11 @@ mod tests {
                     BlsScalar::from(2u64).pow(&[128u64, 0, 0, 0])
                         - BlsScalar::one(),
                 )?;
-                // Constraint res to be false, since the range should not hold.
+                // Constraint res to be true, even the range should not hold.
+                // That should cause the proof to fail on the verification step.
                 composer.constrain_to_constant(
                     res,
-                    BlsScalar::zero(),
+                    BlsScalar::one(),
                     BlsScalar::zero(),
                 );
                 // Since we don't use all of the wires, we set some dummy constraints to
