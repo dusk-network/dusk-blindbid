@@ -140,13 +140,11 @@ impl StorageBid {
         // Constraint the hash to be equal to the real one
         let real_hash: StorageScalar = self.clone().into();
         let real_hash: BlsScalar = real_hash.into();
-        let real_hash_var = composer.add_input(real_hash);
         composer.constrain_to_constant(
-            real_hash_var,
-            real_hash,
+            storage_bid_hash,
             BlsScalar::zero(),
+            -real_hash,
         );
-        composer.assert_equal(real_hash_var, storage_bid_hash);
         storage_bid_hash
     }
 }
@@ -196,7 +194,7 @@ mod tests {
                     encrypted_value: JubJubScalar::from(655588855476u64),
                     randomness: AffinePoint::identity(),
                     secret_k: BlsScalar::random(&mut rand::thread_rng()),
-                    hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
+                    hashed_secret: BlsScalar::default(),
                     pk: AffinePoint::identity(),
                     c: AffinePoint::identity(),
                 }
@@ -213,6 +211,7 @@ mod tests {
         let mut verifier = Verifier::new(b"testing");
         storage_bid.preimage_gadget(verifier.mut_cs());
         verifier.preprocess(&ck)?;
-        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
+        let pi = verifier.mut_cs().public_inputs.clone();
+        verifier.verify(&proof, &vk, &pi)
     }
 }
