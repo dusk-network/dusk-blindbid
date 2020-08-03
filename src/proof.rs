@@ -2,6 +2,9 @@
 
 use crate::bid::{Bid, StorageBid};
 use crate::score_gen::*;
+use dusk_plonk::constraint_system::ecc::{
+    curve_addition, gates::*, scalar_mul,
+};
 use dusk_plonk::prelude::*;
 use failure::Error;
 use poseidon252::{
@@ -40,27 +43,33 @@ pub fn blind_bid_proof(
     )?;
 
     // 5. c = C(v, b) Pedersen Commitment check
-    // XXX: Unimplemented until we have ECC gate.
+    use dusk_plonk::jubjub::{ExtendedPoint, GENERATOR, GENERATOR_NUMS};
+    let bid_value = composer.add_constant_witness(bid.value.into());
+    let blinder = composer.add_constant_witness(bid.blinder.into());
+    let p1 = scalar_mul(composer, bid_value, ExtendedPoint::from(GENERATOR));
+    let p2 = scalar_mul(composer, blinder, ExtendedPoint::from(GENERATOR_NUMS));
+    let computed_c = curve_addition(composer, p1.into(), p2.into());
+    // Assert computed_commitment == announced commitment.
+    composer.assert_equal_public_point(computed_c, bid.c);
 
-    let bid_value: BlsScalar = bid.value.into();
     // 6. v_min < v <= v_max
     // 0 < v -> TODO: Needs review
     single_complex_range_proof(
         composer,
         BlsScalar::from(crate::V_MIN),
-        bid_value,
+        bid.value.into(),
     )?;
     // v <= v_max
     single_complex_range_proof(
         composer,
-        bid_value,
+        bid.value.into(),
         BlsScalar::from(crate::V_MAX),
     )?;
 
     // 7. 0 < value <= 2^64 range check
     // Here is safe to unwrap since the order of the JubJub Scalar field is
     // shorter than the BLS12_381 one.
-    let value = composer.add_input(bid_value);
+    let value = composer.add_input(bid.value.into());
     // v < 2^64
     composer.range_gate(value, 64usize);
 
@@ -68,15 +77,11 @@ pub fn blind_bid_proof(
     let secret_k = composer.add_input(bid.secret_k);
     let secret_k_hash = sponge_hash_gadget(composer, &[secret_k]);
     // Constraint the secret_k_hash to be equal to the publicly avaliable one.
-    // Add the PI as a witness constrained to a constant.
-    let public_secret_k_hash = composer.add_input(sponge_hash(&[bid.secret_k]));
     composer.constrain_to_constant(
-        public_secret_k_hash,
-        sponge_hash(&[bid.secret_k]),
+        secret_k_hash,
         BlsScalar::zero(),
+        -sponge_hash(&[bid.secret_k]),
     );
-    // Constraint the computed secret_k_hash to be equal to the public one.
-    composer.assert_equal(secret_k_hash, public_secret_k_hash);
 
     // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
     let sigma_s = composer.add_input(bid.consensus_round_seed);
@@ -84,20 +89,13 @@ pub fn blind_bid_proof(
     let k_s = composer.add_input(bid.latest_consensus_step);
     let prover_id =
         sponge_hash_gadget(composer, &[secret_k, sigma_s, k_t, k_s]);
-    // Constraint the computed prover_id to the expected & stored one.
-    // Add the prover_id Pub Input constraining the witness and check that it is equal
-    // to the prover_id computed in the proof.
-    let pub_prover_id = composer.add_input(bid.prover_id);
     composer.constrain_to_constant(
-        pub_prover_id,
-        bid.prover_id,
+        prover_id,
         BlsScalar::zero(),
+        -bid.prover_id,
     );
-    composer.assert_equal(prover_id, pub_prover_id);
-
     // 9. Score generation circuit check with the corresponding gadget.
     prove_correct_score_gadget(composer, bid)?;
-
     Ok(())
 }
 
@@ -135,7 +133,7 @@ mod tests {
             encrypted_value: JubJubScalar::from(655588855476u64),
             randomness: AffinePoint::identity(),
             secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
+            hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
             c: AffinePoint::identity(),
         }
@@ -152,6 +150,7 @@ mod tests {
         // Proving
         let mut prover = Prover::new(b"testing");
         blind_bid_proof(prover.mut_cs(), &bid, &branch)?;
+        //assert!(prover.mut_cs().circuit_size() == 49693);
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -159,7 +158,18 @@ mod tests {
         let mut verifier = Verifier::new(b"testing");
         blind_bid_proof(verifier.mut_cs(), &bid, &branch)?;
         verifier.preprocess(&ck)?;
-        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])?;
+
+        // Generate PI array.
+        let mut pi_built = vec![BlsScalar::zero(); 49693];
+        pi_built[39315] = -{
+            let stor_scalar: StorageScalar = StorageBid::from(&bid).into();
+            stor_scalar.into()
+        };
+        pi_built[40895] = -bid.c.get_x();
+        pi_built[40896] = -bid.c.get_y();
+        pi_built[43821] = -bid.hashed_secret;
+        pi_built[47574] = -bid.prover_id;
+        verifier.verify(&proof, &vk, &pi_built)?;
         Ok(())
     }
 
@@ -213,13 +223,22 @@ mod tests {
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
+        // Generate PI array.
+        let mut pi_built = vec![BlsScalar::zero(); 49693];
+        pi_built[39315] = -{
+            let stor_scalar: StorageScalar = StorageBid::from(&bid).into();
+            stor_scalar.into()
+        };
+        pi_built[40895] = -bid.c.get_x();
+        pi_built[40896] = -bid.c.get_y();
+        pi_built[43821] = -bid.hashed_secret;
+        pi_built[47574] = -bid.prover_id;
+
         // Verification
         let mut verifier = Verifier::new(b"testing");
         blind_bid_proof(verifier.mut_cs(), &bid, &branch)?;
         verifier.preprocess(&ck)?;
-        assert!(verifier
-            .verify(&proof, &vk, &vec![BlsScalar::zero()])
-            .is_err());
+        assert!(verifier.verify(&proof, &vk, &pi_built).is_err());
         Ok(())
     }
 }
