@@ -1,7 +1,9 @@
 //! Bid data structure
 
 use crate::score_gen::{compute_score, Score};
-use dusk_plonk::jubjub::AffinePoint;
+use dusk_plonk::jubjub::{
+    AffinePoint, ExtendedPoint, GENERATOR, GENERATOR_NUMS,
+};
 use dusk_plonk::prelude::*;
 use failure::Error;
 use poseidon252::sponge::sponge::sponge_hash;
@@ -51,11 +53,18 @@ pub struct Bid {
 
 impl Bid {
     pub fn init(mut self) -> Result<Self, Error> {
+        // Compute and add the `hashed_secret` to the Bid.
+        self.hashed_secret = sponge_hash(&[self.secret_k]);
         // Compute and add to the Bid the `prover_id`.
         self.generate_prover_id();
         // Compute score and append it to the Bid.
         self.score = compute_score(&self)?;
-
+        // Compute the Pedersen Commitment with the value and the blinder
+        self.c = {
+            let p1 = ExtendedPoint::from(GENERATOR) * self.value;
+            let p2 = ExtendedPoint::from(GENERATOR_NUMS) * self.blinder;
+            (p1 + p2).into()
+        };
         Ok(self)
     }
 
