@@ -1,14 +1,13 @@
 //! Bid data structure
 
+pub(crate) use crate::bid::StorageBid;
 use crate::score_gen::{compute_score, Score};
 use dusk_plonk::jubjub::{
     AffinePoint, ExtendedPoint, GENERATOR, GENERATOR_NUMS,
 };
 use dusk_plonk::prelude::*;
 use failure::Error;
-use poseidon252::sponge::sponge::sponge_hash;
-pub(crate) mod encoding;
-pub use encoding::StorageBid;
+use poseidon252::{encrypt::EncryptedData, sponge::sponge::sponge_hash};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
@@ -87,9 +86,6 @@ impl Bid {
     ) -> Result<Proof, Error> {
         use crate::score_gen::score::prove_correct_score_gadget;
 
-        prove_correct_score_gadget(composer, self)?;
-        // TODO: Return the proof with a pre-computed PreprocessedCircuit and
-        // ProverKey
         unimplemented!()
     }
 }

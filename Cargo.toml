@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 dusk-plonk = "0.2.6"
-poseidon252 = {git = "https://github.com/dusk-network/Poseidon252"}
+poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.0-alpha"}
 failure = "0.1.7"
 kelvin = "0.13.0"
 num-bigint = "0.2.6"
