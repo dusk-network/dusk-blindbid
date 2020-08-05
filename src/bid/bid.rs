@@ -48,6 +48,8 @@ pub struct Bid {
     pub(crate) pk: AffinePoint,
     // c (Pedersen Commitment)
     pub(crate) c: AffinePoint,
+    // n (Nonce)
+    pub(crate) n: BlsScalar,
 }
 
 impl Bid {

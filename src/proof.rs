@@ -136,6 +136,7 @@ mod tests {
             hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
             c: AffinePoint::identity(),
+            n: BlsScalar::random(&mut rand::thread_rng()),
         }
         .init()?;
 
@@ -202,6 +203,7 @@ mod tests {
             hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
             pk: AffinePoint::identity(),
             c: AffinePoint::identity(),
+            n: BlsScalar::random(&mut rand::thread_rng()),
         }
         .init()?;
 
