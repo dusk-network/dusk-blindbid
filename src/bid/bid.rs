@@ -7,7 +7,7 @@ use dusk_plonk::jubjub::{
 };
 use dusk_plonk::prelude::*;
 use failure::Error;
-use poseidon252::{encrypt::EncryptedData, sponge::sponge::sponge_hash};
+use poseidon252::{cipher::PoseidonCipher, sponge::sponge::sponge_hash};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
@@ -23,21 +23,18 @@ pub struct Bid {
     pub(crate) elegibility_ts: u32,
     // t_e
     pub(crate) expiration_ts: u32,
-    //
-    // Public Outputs
-    //
     // i (One time identity of the prover)
     pub(crate) prover_id: BlsScalar,
     // q (Score of the bid)
     pub(crate) score: Score,
     // b (blinder)
     pub(crate) blinder: JubJubScalar,
-    // b_enc (encrypted blinder) // XXX: Scalar for now. Double check
-    pub(crate) encrypted_blinder: JubJubScalar,
+    // b_enc (encrypted blinder)
+    pub(crate) encrypted_blinder: PoseidonCipher,
     // v (Bid value)
     pub(crate) value: JubJubScalar,
     // v_enc (encrypted_value)
-    pub(crate) encrypted_value: JubJubScalar,
+    pub(crate) encrypted_value: PoseidonCipher,
     // R = r * G
     pub(crate) randomness: AffinePoint,
     // k
@@ -56,6 +53,18 @@ impl Bid {
     pub fn init(mut self) -> Result<Self, Error> {
         // Compute and add the `hashed_secret` to the Bid.
         self.hashed_secret = sponge_hash(&[self.secret_k]);
+        // Compute the encrypted value & blinder and add them to
+        // the `Bid` struct.
+        self.encrypted_value = PoseidonCipher::encrypt(
+            &[self.value.into()],
+            &self.randomness,
+            &self.n,
+        );
+        self.encrypted_blinder = PoseidonCipher::encrypt(
+            &[self.blinder.into()],
+            &self.randomness,
+            &self.n,
+        );
         // Compute and add to the Bid the `prover_id`.
         self.generate_prover_id();
         // Compute score and append it to the Bid.
