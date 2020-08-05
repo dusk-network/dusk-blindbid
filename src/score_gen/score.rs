@@ -311,9 +311,12 @@ pub(crate) fn single_complex_range_proof(
 
     let mut var_accumulator = zero;
 
-    let accumulator = bits[..num_bits as usize].iter().enumerate().fold(
+    let accumulator = bits[..].iter().enumerate().fold(
         BlsScalar::zero(),
-        |scalar_accum, (idx, bit)| {
+        |scalar_accum, (idx, mut bit)| {
+            if idx >= num_bits as usize {
+                bit = &0u8;
+            };
             let bit_var = composer.add_input(BlsScalar::from(*bit as u64));
             // Apply boolean constraint to the bit.
             composer.boolean_gate(bit_var);
@@ -569,7 +572,7 @@ mod tests {
             encrypted_value: JubJubScalar::from(655588855476u64),
             randomness: AffinePoint::identity(),
             secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
+            hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
             c: AffinePoint::identity(),
         }
@@ -611,7 +614,7 @@ mod tests {
             encrypted_value: JubJubScalar::from(655588855476u64),
             randomness: AffinePoint::identity(),
             secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
+            hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
             c: AffinePoint::identity(),
         }

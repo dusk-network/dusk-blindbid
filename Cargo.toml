@@ -6,8 +6,7 @@ edition = "2018"
 
 
 [dependencies]
-dusk-plonk = "0.2.0"
-hades252 = {git = "https://github.com/dusk-network/Hades252", tag = "v0.6.0"}
+dusk-plonk = "0.2.6"
 poseidon252 = {git = "https://github.com/dusk-network/Poseidon252"}
 failure = "0.1.7"
 kelvin = "0.13.0"
