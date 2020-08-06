@@ -45,13 +45,13 @@ pub struct Bid {
 }
 
 impl Bid {
-    pub fn init(mut self) -> Result<Self, Error> {
+    pub fn init(mut self, value: &JubJubScalar) -> Result<Self, Error> {
         // Compute and add the `hashed_secret` to the Bid.
         self.hashed_secret = sponge_hash(&[self.secret_k]);
         // Compute and add to the Bid the `prover_id`.
         self.generate_prover_id();
         // Compute score and append it to the Bid.
-        self.score = compute_score(&self)?;
+        self.score = compute_score(&self, value)?;
         Ok(self)
     }
 

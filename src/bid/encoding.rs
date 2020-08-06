@@ -164,8 +164,21 @@ impl StorageBid {
 mod tests {
     use super::*;
     use crate::score_gen::Score;
+    use dusk_plonk::jubjub::{GENERATOR, GENERATOR_NUMS};
     use failure::Error;
     use rand_core::RngCore;
+
+    pub(self) fn gen_val_blinder_and_commitment(
+    ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
+        let value = JubJubScalar::random(&mut rand::thread_rng());
+        let blinder = JubJubScalar::random(&mut rand::thread_rng());
+
+        let commitment: AffinePoint = AffinePoint::from(
+            &(GENERATOR.to_niels() * value)
+                + &(GENERATOR_NUMS.to_niels() * blinder),
+        );
+        (value, blinder, commitment)
+    }
 
     #[ignore]
     #[test]
@@ -180,6 +193,8 @@ mod tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
+
+        let (value, _, commitment) = gen_val_blinder_and_commitment();
 
         // Generate a correct Bid
         let storage_bid =
@@ -215,7 +230,7 @@ mod tests {
                     c: AffinePoint::identity(),
                     n: BlsScalar::random(&mut rand::thread_rng()),
                 }
-                .init()?,
+                .init(&value)?,
             );
 
         // Proving
