@@ -27,14 +27,9 @@ pub struct Bid {
     pub(crate) prover_id: BlsScalar,
     // q (Score of the bid)
     pub(crate) score: Score,
-    // b (blinder)
-    pub(crate) blinder: JubJubScalar,
-    // b_enc (encrypted blinder)
-    pub(crate) encrypted_blinder: PoseidonCipher,
-    // v (Bid value)
-    pub(crate) value: JubJubScalar,
-    // v_enc (encrypted_value)
-    pub(crate) encrypted_value: PoseidonCipher,
+    // The encrypted value & blinder fields were previously encrypted with `ElGamal` schema.
+    pub(crate) encrypted_blinder: (AffinePoint, AffinePoint),
+    pub(crate) encrypted_value: (AffinePoint, AffinePoint),
     // R = r * G
     pub(crate) randomness: AffinePoint,
     // k
@@ -53,28 +48,10 @@ impl Bid {
     pub fn init(mut self) -> Result<Self, Error> {
         // Compute and add the `hashed_secret` to the Bid.
         self.hashed_secret = sponge_hash(&[self.secret_k]);
-        // Compute the encrypted value & blinder and add them to
-        // the `Bid` struct.
-        self.encrypted_value = PoseidonCipher::encrypt(
-            &[self.value.into()],
-            &self.randomness,
-            &self.n,
-        );
-        self.encrypted_blinder = PoseidonCipher::encrypt(
-            &[self.blinder.into()],
-            &self.randomness,
-            &self.n,
-        );
         // Compute and add to the Bid the `prover_id`.
         self.generate_prover_id();
         // Compute score and append it to the Bid.
         self.score = compute_score(&self)?;
-        // Compute the Pedersen Commitment with the value and the blinder
-        self.c = {
-            let p1 = ExtendedPoint::from(GENERATOR) * self.value;
-            let p2 = ExtendedPoint::from(GENERATOR_NUMS) * self.blinder;
-            (p1 + p2).into()
-        };
         Ok(self)
     }
 
