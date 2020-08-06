@@ -13,10 +13,10 @@ pub struct StorageBid {
     pub(crate) elegibility_ts: u32,
     // t_e
     pub(crate) expiration_ts: u32,
-    // b_enc (encrypted blinder) // XXX: Scalar for now. Double check
-    pub(crate) encrypted_blinder: JubJubScalar,
+    // b_enc (encrypted blinder)
+    pub(crate) encrypted_blinder: (AffinePoint, AffinePoint),
     // v_enc (encrypted_value)
-    pub(crate) encrypted_value: JubJubScalar,
+    pub(crate) encrypted_value: (AffinePoint, AffinePoint),
     // R = r * G
     pub(crate) randomness: AffinePoint,
     // m
@@ -65,7 +65,7 @@ impl Into<StorageScalar> for StorageBid {
 
         // Safe unwrap here.
         let type_fields =
-            BlsScalar::from_bytes(b"44223133000000000000000000000000").unwrap();
+            BlsScalar::from_bytes(b"44333313300000000000000000000000").unwrap();
         words_deposit.push(type_fields);
 
         // 2. Encode each word.
@@ -74,10 +74,15 @@ impl Into<StorageScalar> for StorageBid {
         words_deposit.push(BlsScalar::from(self.elegibility_ts as u64));
         words_deposit.push(BlsScalar::from(self.expiration_ts as u64));
 
-        // A conversion between JubJubScalar to BlsScalar is always safe since
-        // the order of a JubJubScalar field is shorter than a BlsScalar one.
-        words_deposit.push(self.encrypted_blinder.into());
-        words_deposit.push(self.encrypted_value.into());
+        // Push both JubJubAffine coordinates as a Scalar.
+        words_deposit.push(self.encrypted_value.0.get_x());
+        words_deposit.push(self.encrypted_value.0.get_y());
+        words_deposit.push(self.encrypted_value.1.get_x());
+        words_deposit.push(self.encrypted_value.1.get_y());
+
+        // Push both JubJubAffine coordinates as a Scalar.
+        words_deposit.push(self.pk.get_x());
+        words_deposit.push(self.pk.get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.randomness.get_x());
@@ -115,7 +120,7 @@ impl StorageBid {
         // It has been already checked that it's safe to unwrap here since the
         // value fits correctly in a `BlsScalar`.
         let type_fields =
-            BlsScalar::from_bytes(b"44223133000000000000000000000000").unwrap();
+            BlsScalar::from_bytes(b"44333313300000000000000000000000").unwrap();
         // Add to the composer the values required for the preimage.
         let mut messages: Vec<Variable> = vec![];
         messages.push(composer.add_input(type_fields));
@@ -125,13 +130,19 @@ impl StorageBid {
         messages.push(
             composer.add_input(BlsScalar::from(self.expiration_ts as u64)),
         );
-        messages.push(composer.add_input(self.encrypted_blinder.into()));
-        messages.push(composer.add_input(self.encrypted_value.into()));
+        // Push both JubJubAffine coordinates as a Scalar.
+        messages.push(composer.add_input(self.encrypted_value.0.get_x()));
+        messages.push(composer.add_input(self.encrypted_value.0.get_y()));
+        messages.push(composer.add_input(self.encrypted_value.1.get_x()));
+        messages.push(composer.add_input(self.encrypted_value.1.get_y()));
+        // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.randomness.get_x()));
         messages.push(composer.add_input(self.randomness.get_y()));
         messages.push(composer.add_input(self.hashed_secret));
+        // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.pk.get_x()));
         messages.push(composer.add_input(self.pk.get_y()));
+        // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.c.get_x()));
         messages.push(composer.add_input(self.c.get_y()));
 
@@ -188,10 +199,15 @@ mod tests {
                     expiration_ts: rand::thread_rng().next_u32(),
                     prover_id: BlsScalar::default(),
                     score: Score::default(),
-                    blinder: JubJubScalar::from(99u64),
-                    encrypted_blinder: JubJubScalar::from(199u64),
-                    value: JubJubScalar::from(6546546u64),
-                    encrypted_value: JubJubScalar::from(655588855476u64),
+
+                    encrypted_blinder: (
+                        AffinePoint::default(),
+                        AffinePoint::default(),
+                    ),
+                    encrypted_value: (
+                        AffinePoint::default(),
+                        AffinePoint::default(),
+                    ),
                     randomness: AffinePoint::identity(),
                     secret_k: BlsScalar::random(&mut rand::thread_rng()),
                     hashed_secret: BlsScalar::default(),
