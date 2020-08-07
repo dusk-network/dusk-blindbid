@@ -49,8 +49,8 @@ impl Bid {
     pub fn init(mut self, value: &JubJubScalar) -> Result<Self, Error> {
         // Check if the bid_value is in the correct range, otherways, fail.
         match (
-            value > &JubJubScalar::from(crate::V_MAX),
-            value < &JubJubScalar::from(crate::V_MIN),
+            value.reduce() > JubJubScalar::from(crate::V_MAX).reduce(),
+            value.reduce() < JubJubScalar::from(crate::V_MIN).reduce(),
         ) {
             (true, false) => {
                 return Err(BidGenerationError::MaximumBidValueExceeded.into());
