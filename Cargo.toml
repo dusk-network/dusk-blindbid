@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 dusk-plonk = {version = "0.2.6", features = ["trace-print"]}
-poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", branch = "poseidon-encrypt"}
+poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.0"}
 failure = "0.1.7"
 kelvin = "0.13.0"
 num-bigint = "0.2.6"
