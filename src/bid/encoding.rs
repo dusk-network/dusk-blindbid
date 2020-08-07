@@ -167,7 +167,7 @@ mod tests {
 
     pub(self) fn gen_val_blinder_and_commitment(
     ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
-        let value = JubJubScalar::random(&mut rand::thread_rng());
+        let value = JubJubScalar::from(240_000u64);
         let blinder = JubJubScalar::random(&mut rand::thread_rng());
 
         let commitment: AffinePoint = AffinePoint::from(
