@@ -1,14 +1,11 @@
 //! Bid data structure
 
 use super::BidGenerationError;
-pub(crate) use crate::bid::StorageBid;
 use crate::score_gen::{compute_score, Score};
-use dusk_plonk::jubjub::{
-    AffinePoint, ExtendedPoint, GENERATOR, GENERATOR_NUMS,
-};
+use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
 use failure::Error;
-use poseidon252::{cipher::PoseidonCipher, sponge::sponge::sponge_hash};
+use poseidon252::sponge::sponge::sponge_hash;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
