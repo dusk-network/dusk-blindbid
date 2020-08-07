@@ -451,7 +451,7 @@ mod tests {
 
     pub(self) fn gen_val_blinder_and_commitment(
     ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
-        let value = JubJubScalar::random(&mut rand::thread_rng());
+        let value = JubJubScalar::from(250_000u64);
         let blinder = JubJubScalar::random(&mut rand::thread_rng());
 
         let commitment: AffinePoint = AffinePoint::from(
@@ -637,7 +637,7 @@ mod tests {
         }
         .init(&value)?;
 
-        // Edit score fields
+        // Edit score fields which should make the test fail
         let mut score = bid.score;
         score.score = BlsScalar::from(5686536568u64);
         score.r1 = BlsScalar::from(5898956968u64);

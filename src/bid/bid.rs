@@ -1,5 +1,6 @@
 //! Bid data structure
 
+use super::BidGenerationError;
 pub(crate) use crate::bid::StorageBid;
 use crate::score_gen::{compute_score, Score};
 use dusk_plonk::jubjub::{
@@ -46,6 +47,20 @@ pub struct Bid {
 
 impl Bid {
     pub fn init(mut self, value: &JubJubScalar) -> Result<Self, Error> {
+        // Check if the bid_value is in the correct range, otherways, fail.
+        match (
+            value > &JubJubScalar::from(crate::V_MAX),
+            value < &JubJubScalar::from(crate::V_MIN),
+        ) {
+            (true, false) => {
+                return Err(BidGenerationError::MaximumBidValueExceeded.into());
+            }
+            (false, true) => {
+                return Err(BidGenerationError::MinimumBidValueUnreached.into());
+            }
+            (false, false) => (),
+            (_, _) => unreachable!(),
+        }
         // Compute and add the `hashed_secret` to the Bid.
         self.hashed_secret = sponge_hash(&[self.secret_k]);
         // Compute and add to the Bid the `prover_id`.

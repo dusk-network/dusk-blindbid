@@ -77,8 +77,8 @@ impl Into<StorageScalar> for StorageBid {
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.encrypted_value.0.get_x());
         words_deposit.push(self.encrypted_value.0.get_y());
-        words_deposit.push(self.encrypted_value.1.get_x());
-        words_deposit.push(self.encrypted_value.1.get_y());
+        words_deposit.push(self.encrypted_blinder.1.get_x());
+        words_deposit.push(self.encrypted_blinder.1.get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.pk.get_x());
@@ -89,9 +89,6 @@ impl Into<StorageScalar> for StorageBid {
         words_deposit.push(self.randomness.get_y());
 
         words_deposit.push(self.hashed_secret);
-        // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.pk.get_x());
-        words_deposit.push(self.pk.get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.c.get_x());
@@ -133,15 +130,15 @@ impl StorageBid {
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.encrypted_value.0.get_x()));
         messages.push(composer.add_input(self.encrypted_value.0.get_y()));
-        messages.push(composer.add_input(self.encrypted_value.1.get_x()));
-        messages.push(composer.add_input(self.encrypted_value.1.get_y()));
+        messages.push(composer.add_input(self.encrypted_blinder.1.get_x()));
+        messages.push(composer.add_input(self.encrypted_blinder.1.get_y()));
+        // Push both JubJubAffine coordinates as a Scalar.
+        messages.push(composer.add_input(self.pk.get_x()));
+        messages.push(composer.add_input(self.pk.get_y()));
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.randomness.get_x()));
         messages.push(composer.add_input(self.randomness.get_y()));
         messages.push(composer.add_input(self.hashed_secret));
-        // Push both JubJubAffine coordinates as a Scalar.
-        messages.push(composer.add_input(self.pk.get_x()));
-        messages.push(composer.add_input(self.pk.get_y()));
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.c.get_x()));
         messages.push(composer.add_input(self.c.get_y()));
@@ -227,7 +224,7 @@ mod tests {
                     secret_k: BlsScalar::random(&mut rand::thread_rng()),
                     hashed_secret: BlsScalar::default(),
                     pk: AffinePoint::identity(),
-                    c: AffinePoint::identity(),
+                    c: commitment,
                     n: BlsScalar::random(&mut rand::thread_rng()),
                 }
                 .init(&value)?,
