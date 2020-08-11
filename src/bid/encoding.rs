@@ -225,7 +225,6 @@ mod tests {
                     hashed_secret: BlsScalar::default(),
                     pk: AffinePoint::identity(),
                     c: commitment,
-                    n: BlsScalar::random(&mut rand::thread_rng()),
                 }
                 .init(&value)?,
             );
