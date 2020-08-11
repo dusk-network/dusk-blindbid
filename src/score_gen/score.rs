@@ -36,7 +36,10 @@ impl Score {
 }
 
 /// Given a `Bid`, compute it's Score and return it.
-pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
+pub(crate) fn compute_score(
+    bid: &Bid,
+    bid_value: &JubJubScalar,
+) -> Result<Score, Error> {
     // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
     // latest_consensus_round, latest_consensus_step)`.
     let y = sponge::sponge_hash(&[
@@ -54,7 +57,7 @@ pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
 
     // Get the bid value outside of the modular field and treat it as
     // an integer.
-    let bid_value = BigUint::from_bytes_le(&bid.value.to_bytes());
+    let bid_value = BigUint::from_bytes_le(&bid_value.to_bytes());
     // Compute the final score
     let (f, r2) = match y_prime == BigUint::zero() {
         // If y' != 0 -> f = (bid_value * 2^128 / y')
@@ -85,10 +88,8 @@ pub(crate) fn compute_score(bid: &Bid) -> Result<Score, Error> {
 pub fn prove_correct_score_gadget(
     composer: &mut StandardComposer,
     bid: &Bid,
+    bid_value: Variable,
 ) -> Result<(), Error> {
-    // This unwrap is safe since the order of the JubJubScalar is shorter.
-    let bid_value = composer.add_input(bid.value.into());
-    // Safe to unwrap here.
     let score = bid.score;
     let r1 = composer.add_input(score.r1);
     let r2 = composer.add_input(score.r2);
@@ -445,8 +446,20 @@ fn bits_count(mut scalar: BlsScalar) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dusk_plonk::jubjub::AffinePoint;
+    use dusk_plonk::jubjub::{AffinePoint, GENERATOR, GENERATOR_NUMS};
     use rand_core::RngCore;
+
+    pub(self) fn gen_val_blinder_and_commitment(
+    ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
+        let value = JubJubScalar::from(250_000u64);
+        let blinder = JubJubScalar::random(&mut rand::thread_rng());
+
+        let commitment: AffinePoint = AffinePoint::from(
+            &(GENERATOR.to_niels() * value)
+                + &(GENERATOR_NUMS.to_niels() * blinder),
+        );
+        (value, blinder, commitment)
+    }
 
     #[test]
     fn counting_scalar_bits() {
@@ -556,6 +569,8 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
+        let (value, _, commitment) = gen_val_blinder_and_commitment();
+
         // Generate a correct Bid
         let bid = &Bid {
             bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
@@ -566,27 +581,27 @@ mod tests {
             expiration_ts: rand::thread_rng().next_u32(),
             prover_id: BlsScalar::default(),
             score: Score::default(),
-            blinder: JubJubScalar::from(99u64),
-            encrypted_blinder: JubJubScalar::from(199u64),
-            value: JubJubScalar::from(6546546u64),
-            encrypted_value: JubJubScalar::from(655588855476u64),
+            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
+            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
             randomness: AffinePoint::identity(),
             secret_k: BlsScalar::random(&mut rand::thread_rng()),
             hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
-            c: AffinePoint::identity(),
+            c: commitment,
         }
-        .init()?;
+        .init(&value)?;
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        prove_correct_score_gadget(prover.mut_cs(), &bid)?;
+        let value_var = prover.mut_cs().add_input(value.into());
+        prove_correct_score_gadget(prover.mut_cs(), &bid, value_var)?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        prove_correct_score_gadget(verifier.mut_cs(), &bid)?;
+        let value_var = verifier.mut_cs().add_input(value.into());
+        prove_correct_score_gadget(verifier.mut_cs(), &bid, value_var)?;
         verifier.preprocess(&ck)?;
         verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
@@ -598,6 +613,8 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
+        let (value, _, commitment) = gen_val_blinder_and_commitment();
+
         // Generate a correct Bid
         let mut bid = Bid {
             bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
@@ -608,19 +625,17 @@ mod tests {
             expiration_ts: rand::thread_rng().next_u32(),
             prover_id: BlsScalar::default(),
             score: Score::default(),
-            blinder: JubJubScalar::from(99u64),
-            encrypted_blinder: JubJubScalar::from(199u64),
-            value: JubJubScalar::from(6546546u64),
-            encrypted_value: JubJubScalar::from(655588855476u64),
+            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
+            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
             randomness: AffinePoint::identity(),
             secret_k: BlsScalar::random(&mut rand::thread_rng()),
             hashed_secret: BlsScalar::default(),
             pk: AffinePoint::identity(),
-            c: AffinePoint::identity(),
+            c: commitment,
         }
-        .init()?;
+        .init(&value)?;
 
-        // Edit score fields
+        // Edit score fields which should make the test fail
         let mut score = bid.score;
         score.score = BlsScalar::from(5686536568u64);
         score.r1 = BlsScalar::from(5898956968u64);
@@ -628,13 +643,15 @@ mod tests {
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        prove_correct_score_gadget(prover.mut_cs(), &bid)?;
+        let value_var = prover.mut_cs().add_input(value.into());
+        prove_correct_score_gadget(prover.mut_cs(), &bid, value_var)?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        prove_correct_score_gadget(verifier.mut_cs(), &bid)?;
+        let value_var = verifier.mut_cs().add_input(value.into());
+        prove_correct_score_gadget(verifier.mut_cs(), &bid, value_var)?;
         verifier.preprocess(&ck)?;
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
