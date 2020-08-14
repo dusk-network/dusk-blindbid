@@ -161,8 +161,8 @@ impl StorageBid {
 mod tests {
     use super::*;
     use crate::score_gen::Score;
+    use anyhow::Result;
     use dusk_plonk::jubjub::{GENERATOR, GENERATOR_NUMS};
-    use failure::Error;
     use rand_core::RngCore;
 
     pub(self) fn gen_val_blinder_and_commitment(
@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_bid_preimage_gadget() -> Result<(), Error> {
+    fn storage_bid_preimage_gadget() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
