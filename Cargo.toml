@@ -6,13 +6,15 @@ edition = "2018"
 
 
 [dependencies]
-dusk-plonk = {version = "0.2.6", features = ["trace-print"]}
-poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.0"}
-failure = "0.1.7"
+anyhow = "1.0.0"
+dusk-plonk = {version = "0.2.7", features = ["trace-print"]}
+poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.1"}
 kelvin = "0.13.0"
 num-bigint = "0.2.6"
 num-traits = "0.2.11"
+thiserror = "1.0.20"
 
 [dev-dependencies]
 rand = "0.7.3"
 rand_core = "0.5.1"
+

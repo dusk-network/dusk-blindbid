@@ -1,15 +1,15 @@
 //! Errors related to the Score Generation
 
-use failure::Fail;
+use thiserror::Error;
 
 /// Definition of the erros that Bid operations might have.
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum ScoreError {
     /// Error for the cases when we the score results are too large to
     /// fit inside a `Scalar`.
-    #[fail(display = "score results do not fit inside of Scalar")]
+    #[error("score results do not fit inside of Scalar")]
     InvalidScoreFieldsLen,
     /// Error for computations of inverses that do not exists (non-Qr's)
-    #[fail(display = "Inverse of the Scalar does not exist")]
+    #[error("Inverse of the Scalar does not exist")]
     NonExistingInverse,
 }

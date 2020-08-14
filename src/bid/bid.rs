@@ -2,9 +2,9 @@
 
 use super::BidGenerationError;
 use crate::score_gen::{compute_score, Score};
+use anyhow::{Error, Result};
 use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
-use failure::Error;
 use poseidon252::sponge::sponge::sponge_hash;
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -44,14 +44,22 @@ impl Bid {
     pub fn init(mut self, value: &JubJubScalar) -> Result<Self, Error> {
         // Check if the bid_value is in the correct range, otherways, fail.
         match (
-            value.reduce() > JubJubScalar::from(crate::V_MAX).reduce(),
-            value.reduce() < JubJubScalar::from(crate::V_MIN).reduce(),
+            value.reduce() > crate::V_MAX.reduce(),
+            value.reduce() < crate::V_MIN.reduce(),
         ) {
             (true, false) => {
-                return Err(BidGenerationError::MaximumBidValueExceeded.into());
+                return Err(BidGenerationError::MaximumBidValueExceeded {
+                    max_val: crate::V_MAX,
+                    found: *value,
+                }
+                .into());
             }
             (false, true) => {
-                return Err(BidGenerationError::MinimumBidValueUnreached.into());
+                return Err(BidGenerationError::MinimumBidValueUnreached {
+                    min_val: crate::V_MIN,
+                    found: *value,
+                }
+                .into());
             }
             (false, false) => (),
             (_, _) => unreachable!(),
