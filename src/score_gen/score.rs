@@ -2,8 +2,8 @@
 
 use super::errors::ScoreError;
 use crate::bid::Bid;
+use anyhow::{Error, Result};
 use dusk_plonk::prelude::*;
-use failure::Error;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use poseidon252::sponge::*;
