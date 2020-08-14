@@ -15,7 +15,7 @@ pub enum BidGenerationError<'a> {
         /// The maximum bid_value allowed
         max_val: &'a JubJubScalar,
         /// The expected length
-        found: &'a JubJubScalar,
+        found: JubJubScalar,
     },
     /// Error for the cases when we the provided Bid value is lower
     /// than the minimum allowed by the specs..
@@ -26,6 +26,6 @@ pub enum BidGenerationError<'a> {
         /// The minimum bid_value required
         min_val: &'a JubJubScalar,
         /// The expected length
-        found: &'a JubJubScalar,
+        found: JubJubScalar,
     },
 }
