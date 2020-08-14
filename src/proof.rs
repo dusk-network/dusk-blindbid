@@ -2,11 +2,11 @@
 
 use crate::bid::{Bid, StorageBid};
 use crate::score_gen::*;
+use anyhow::Result;
 use dusk_plonk::constraint_system::ecc::{
     curve_addition, gates::*, scalar_mul,
 };
 use dusk_plonk::prelude::*;
-use failure::Error;
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
     StorageScalar,
@@ -19,7 +19,7 @@ pub fn blind_bid_proof(
     branch: &PoseidonBranch,
     value: JubJubScalar,
     blinder: JubJubScalar,
-) -> Result<(), Error> {
+) -> Result<()> {
     // Get the corresponding `StorageBid` value that for the `Bid`
     // which is effectively the value of the proven leaf.
     let storage_bid = StorageBid::from(bid);
@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_blindbid_proof() -> Result<(), Error> {
+    fn correct_blindbid_proof() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn edited_score_blindbid_proof() -> Result<(), Error> {
+    fn edited_score_blindbid_proof() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn edited_bid_value_blindbid_proof() -> Result<(), Error> {
+    fn edited_bid_value_blindbid_proof() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
