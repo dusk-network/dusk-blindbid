@@ -46,8 +46,8 @@ pub fn blind_bid_proof(
 
     // 5. c = C(v, b) Pedersen Commitment check
     use dusk_plonk::jubjub::{ExtendedPoint, GENERATOR, GENERATOR_NUMS};
-    let bid_value = composer.add_witness_to_circuit_description(value.into());
-    let blinder = composer.add_witness_to_circuit_description(blinder.into());
+    let bid_value = composer.add_input(value.into());
+    let blinder = composer.add_input(blinder.into());
     let p1 = scalar_mul(composer, bid_value, ExtendedPoint::from(GENERATOR));
     let p2 = scalar_mul(composer, blinder, ExtendedPoint::from(GENERATOR_NUMS));
     let computed_c = curve_addition(composer, p1.into(), p2.into());
