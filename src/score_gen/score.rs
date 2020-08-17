@@ -446,7 +446,9 @@ fn bits_count(mut scalar: BlsScalar) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dusk_plonk::jubjub::{AffinePoint, GENERATOR, GENERATOR_NUMS};
+    use dusk_plonk::jubjub::{
+        AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
+    };
     use rand_core::RngCore;
 
     pub(self) fn gen_val_blinder_and_commitment(
@@ -455,8 +457,8 @@ mod tests {
         let blinder = JubJubScalar::random(&mut rand::thread_rng());
 
         let commitment: AffinePoint = AffinePoint::from(
-            &(GENERATOR.to_niels() * value)
-                + &(GENERATOR_NUMS.to_niels() * blinder),
+            &(GENERATOR_EXTENDED * value)
+                + &(GENERATOR_NUMS_EXTENDED * blinder),
         );
         (value, blinder, commitment)
     }

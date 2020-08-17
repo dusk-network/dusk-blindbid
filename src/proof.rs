@@ -6,6 +6,7 @@ use anyhow::Result;
 use dusk_plonk::constraint_system::ecc::{
     curve_addition, gates::*, scalar_mul,
 };
+use dusk_plonk::jubjub::{GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::prelude::*;
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
@@ -45,11 +46,10 @@ pub fn blind_bid_proof(
     )?;
 
     // 5. c = C(v, b) Pedersen Commitment check
-    use dusk_plonk::jubjub::{ExtendedPoint, GENERATOR, GENERATOR_NUMS};
     let bid_value = composer.add_input(value.into());
     let blinder = composer.add_input(blinder.into());
-    let p1 = scalar_mul(composer, bid_value, ExtendedPoint::from(GENERATOR));
-    let p2 = scalar_mul(composer, blinder, ExtendedPoint::from(GENERATOR_NUMS));
+    let p1 = scalar_mul(composer, bid_value, GENERATOR_EXTENDED);
+    let p2 = scalar_mul(composer, blinder, GENERATOR_NUMS_EXTENDED);
     let computed_c = curve_addition(composer, p1.into(), p2.into());
     // Assert computed_commitment == announced commitment.
     composer.assert_equal_public_point(computed_c, bid.c);
@@ -90,7 +90,9 @@ pub fn blind_bid_proof(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dusk_plonk::jubjub::{AffinePoint, GENERATOR, GENERATOR_NUMS};
+    use dusk_plonk::jubjub::{
+        AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
+    };
     use kelvin::Blake2b;
     use poseidon252::PoseidonTree;
     use rand_core::RngCore;
@@ -101,8 +103,8 @@ mod tests {
         let blinder = JubJubScalar::random(&mut rand::thread_rng());
 
         let commitment: AffinePoint = AffinePoint::from(
-            &(GENERATOR.to_niels() * value)
-                + &(GENERATOR_NUMS.to_niels() * blinder),
+            &(GENERATOR_EXTENDED * value)
+                + &(GENERATOR_NUMS_EXTENDED * blinder),
         );
         (value, blinder, commitment)
     }
