@@ -8,6 +8,10 @@ use dusk_plonk::constraint_system::ecc::{
 };
 use dusk_plonk::jubjub::{GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::prelude::*;
+use plonk_gadgets::{
+    AllocatedScalar,
+    RangeGadgets::{max_bound, range_check},
+};
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
     StorageScalar,
@@ -21,29 +25,53 @@ pub fn blind_bid_proof(
     value: JubJubScalar,
     blinder: JubJubScalar,
 ) -> Result<()> {
+    // Generate constant witness values for 0.
+    let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
     // Get the corresponding `StorageBid` value that for the `Bid`
     // which is effectively the value of the proven leaf.
     let storage_bid = StorageBid::from(bid);
     let encoded_bid: StorageScalar = storage_bid.into();
     let proven_leaf = composer.add_input(encoded_bid.into());
+    // Allocate bid-needed inputs
+    let latest_consensus_step =
+        AllocatedScalar::allocate(composer, bid.latest_consensus_step);
+    let elegibility_ts = AllocatedScalar::allocate(
+        composer,
+        BlsScalar::from(bid.elegibility_ts as u64),
+    );
+    let expiration_ts = AllocatedScalar::allocate(
+        composer,
+        BlsScalar::from(bid.expiration_ts as u64),
+    );
 
     // 1. Merkle Opening
     merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
     // 2. Bid pre_image check
     storage_bid.preimage_gadget(composer);
-    // 3. k_t <= t_a range check XXX: Needs review!
-    single_complex_range_proof(
+    // 3. k_t <= t_a
+    let third_cond = range_check(
         composer,
-        BlsScalar::from(storage_bid.elegibility_ts as u64),
-        bid.latest_consensus_step,
-    )?;
+        latest_consensus_step.scalar,
+        -BlsScalar::one(),
+        elegibility_ts,
+    ); // XXX: Does t_a have a max?
 
     // 4. t_e <= k_t
-    single_complex_range_proof(
-        composer,
-        BlsScalar::from(storage_bid.expiration_ts as u64),
-        bid.latest_consensus_step,
-    )?;
+    let fourth_cond =
+        max_bound(composer, latest_consensus_step.scalar, expiration_ts).0;
+    // Constraint third and fourth conditions to be true.
+    // So basically, that the rangeproofs hold.
+    composer.poly_gate(
+        third_cond,
+        fourth_cond,
+        zero,
+        BlsScalar::one(),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
+    );
 
     // 5. c = C(v, b) Pedersen Commitment check
     let bid_value = composer.add_input(value.into());
