@@ -1,6 +1,7 @@
 //! Score generation
 
 use super::errors::ScoreError;
+use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
 use crate::bid::Bid;
 use anyhow::{Error, Result};
 use dusk_plonk::prelude::*;
@@ -116,16 +117,10 @@ pub fn prove_correct_score_gadget(
     // 2.1. First op will be a complex rangeproof between r1 and the range
     // (Order of the Scalar Field / 2^128 (No modular division)) The result
     // should be 0 if the rangeproof holds.
-    let scalar_field_ord_div_2_pow_128 = {
-        let scalar_field_order =
-            BigUint::from_bytes_le(&(-BlsScalar::one()).to_bytes())
-                + BigUint::one();
-        scalar_field_order / &two_pow_128_buint
-    };
     let first_cond = single_complex_range_proof(
         composer,
         score.r1,
-        biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
+        SCALAR_FIELD_ORD_DIV_2_POW_128,
     )?;
 
     // 2.2. Then we have a single Rangeproof between Y' being in the range
@@ -145,14 +140,11 @@ pub fn prove_correct_score_gadget(
     let third_cond = {
         let zero_or_other = composer.add(
             (BlsScalar::one(), r1),
-            (
-                -biguint_to_scalar(scalar_field_ord_div_2_pow_128.clone())?,
-                one,
-            ),
+            (-SCALAR_FIELD_ORD_DIV_2_POW_128, one),
             BlsScalar::zero(),
             BlsScalar::zero(),
         );
-        let u = score.r1 - biguint_to_scalar(scalar_field_ord_div_2_pow_128)?;
+        let u = score.r1 - SCALAR_FIELD_ORD_DIV_2_POW_128;
         // Conditionally assign `1` or `0` to `y`.
         let y = if u == BlsScalar::zero() {
             composer.add_input(BlsScalar::one())
@@ -203,16 +195,12 @@ pub fn prove_correct_score_gadget(
         composer.assert_equal(y_times_u, zero);
         y
     };
-    // 2.4. Finally, A rangeproof for y' checking it's between [0, Order of the
-    // ScalarField mod 2^128]. We will apply the complex rangeproof too.
-    let minus_one_mod_2_pow_128 = {
-        let min_one = BigUint::from_bytes_le(&(-BlsScalar::one()).to_bytes());
-        min_one % &two_pow_128_buint
-    };
+    // 2.4. Finally, constraints for y' checking it's between
+    // [0, Order of the ScalarField mod 2^128].
     let fourth_cond = single_complex_range_proof(
         composer,
         score.y_prime,
-        biguint_to_scalar(minus_one_mod_2_pow_128)?,
+        MINUS_ONE_MOD_2_POW_128,
     )?;
     // Apply the point 2 constraint.
     //(r1 < |Fr|/2^128 AND Y' < 2^128 +1)
@@ -289,7 +277,6 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
-
     Ok(())
 }
 
