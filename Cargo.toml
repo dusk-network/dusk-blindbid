@@ -12,7 +12,7 @@ poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.
 kelvin = "0.13.0"
 num-bigint = "0.2.6"
 num-traits = "0.2.11"
-plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", branch = "update_mod"}
+plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.2.0"}
 thiserror = "1.0.20"
 
 [dev-dependencies]
