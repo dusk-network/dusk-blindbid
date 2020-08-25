@@ -1,6 +1,6 @@
 //! Errors related to the Bid Generation
 
-use dusk_plonk::jubjub::Fr as JubJubScalar;
+use dusk_plonk::prelude::*;
 use thiserror::Error;
 
 /// Definition of the erros that Bid operations might have.
@@ -28,4 +28,7 @@ pub enum BidGenerationError<'a> {
         /// The expected length
         found: JubJubScalar,
     },
+    /// Error when there is a decrypt attempt with the wrong secret
+    #[error("The provided secret could not decrypt the data correctly")]
+    WrongSecretProvided,
 }

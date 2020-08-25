@@ -3,10 +3,10 @@
 use crate::bid::{Bid, StorageBid};
 use crate::score_gen::*;
 use anyhow::Result;
-use dusk_plonk::constraint_system::ecc::{
-    curve_addition, gates::*, scalar_mul,
+use dusk_plonk::constraint_system::ecc::{curve_addition, scalar_mul};
+use dusk_plonk::jubjub::{
+    AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
-use dusk_plonk::jubjub::{GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::prelude::*;
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
@@ -18,8 +18,7 @@ pub fn blind_bid_proof(
     composer: &mut StandardComposer,
     bid: &Bid,
     branch: &PoseidonBranch,
-    value: JubJubScalar,
-    blinder: JubJubScalar,
+    secret: &AffinePoint,
 ) -> Result<()> {
     // Get the corresponding `StorageBid` value that for the `Bid`
     // which is effectively the value of the proven leaf.
@@ -44,6 +43,10 @@ pub fn blind_bid_proof(
         BlsScalar::from(storage_bid.expiration_ts as u64),
         bid.latest_consensus_step,
     )?;
+
+    let decrypted_data = bid.encrypted_data.decrypt(secret, &bid.nonce)?;
+    let value = decrypted_data[0];
+    let blinder = decrypted_data[1];
 
     // 5. c = C(v, b) Pedersen Commitment check
     let bid_value = composer.add_input(value.into());
@@ -90,24 +93,10 @@ pub fn blind_bid_proof(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dusk_plonk::jubjub::{
-        AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
-    };
+    use crate::bid::bid::tests::random_bid;
+    use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
     use kelvin::Blake2b;
     use poseidon252::PoseidonTree;
-    use rand_core::RngCore;
-
-    pub(self) fn gen_val_blinder_and_commitment(
-    ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
-        let value = JubJubScalar::from(235_000u64);
-        let blinder = JubJubScalar::random(&mut rand::thread_rng());
-
-        let commitment: AffinePoint = AffinePoint::from(
-            &(GENERATOR_EXTENDED * value)
-                + &(GENERATOR_NUMS_EXTENDED * blinder),
-        );
-        (value, blinder, commitment)
-    }
 
     #[test]
     fn correct_blindbid_proof() -> Result<()> {
@@ -116,30 +105,13 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, blinder, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
-        let bid = Bid {
-            bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-            consensus_round_seed: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_round: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_step: BlsScalar::random(&mut rand::thread_rng()),
-            elegibility_ts: rand::thread_rng().next_u32(),
-            expiration_ts: rand::thread_rng().next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
-            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
-            randomness: AffinePoint::identity(),
-            secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::default(),
-            pk: AffinePoint::identity(),
-            c: commitment,
-        }
-        .init(&value)?;
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let bid = random_bid(&secret);
+        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
 
         // Append the StorageBid as an StorageScalar to the tree.
         tree.push(StorageBid::from(&bid).into())?;
@@ -151,14 +123,14 @@ mod tests {
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        blind_bid_proof(prover.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(prover.mut_cs(), &bid, &branch, &secret)?;
         //assert!(prover.mut_cs().circuit_size() == 49693);
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(verifier.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(verifier.mut_cs(), &bid, &branch, &secret)?;
         verifier.preprocess(&ck)?;
 
         let pi = verifier.mut_cs().public_inputs.clone();
@@ -173,30 +145,13 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, blinder, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
-        let mut bid = Bid {
-            bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-            consensus_round_seed: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_round: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_step: BlsScalar::random(&mut rand::thread_rng()),
-            elegibility_ts: rand::thread_rng().next_u32(),
-            expiration_ts: rand::thread_rng().next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
-            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
-            randomness: AffinePoint::identity(),
-            secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
-            pk: AffinePoint::identity(),
-            c: commitment,
-        }
-        .init(&value)?;
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let mut bid = random_bid(&secret);
+        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
 
         // Edit the Bid structure to cheat by incrementing the Score.
         bid.score.score = -BlsScalar::one();
@@ -212,13 +167,13 @@ mod tests {
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        blind_bid_proof(prover.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(prover.mut_cs(), &bid, &branch, &secret)?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(verifier.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(verifier.mut_cs(), &bid, &branch, &secret)?;
         verifier.preprocess(&ck)?;
         let pi = verifier.mut_cs().public_inputs.clone();
         assert!(verifier.verify(&proof, &vk, &pi).is_err());
@@ -232,32 +187,17 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, blinder, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
-        let bid = Bid {
-            bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-            consensus_round_seed: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_round: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_step: BlsScalar::random(&mut rand::thread_rng()),
-            elegibility_ts: rand::thread_rng().next_u32(),
-            expiration_ts: rand::thread_rng().next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
-            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
-            randomness: AffinePoint::identity(),
-            secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::random(&mut rand::thread_rng()),
-            pk: AffinePoint::identity(),
-            c: commitment,
-        }
-        .init(&value)?;
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let mut bid = random_bid(&secret);
+        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
 
-        let value = JubJubScalar::from(2u64).pow(&[65, 0, 0, 0u64]);
+        let value = crate::V_MAX + JubJubScalar::one();
+        bid.set_value(&mut rand::thread_rng(), &value, &secret);
+
         // Append the StorageBid as an StorageScalar to the tree.
         tree.push(StorageBid::from(&bid).into())?;
 
@@ -268,13 +208,13 @@ mod tests {
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        blind_bid_proof(prover.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(prover.mut_cs(), &bid, &branch, &secret)?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(verifier.mut_cs(), &bid, &branch, value, blinder)?;
+        blind_bid_proof(verifier.mut_cs(), &bid, &branch, &secret)?;
         verifier.preprocess(&ck)?;
         let pi = verifier.mut_cs().public_inputs.clone();
         assert!(verifier.verify(&proof, &vk, &pi).is_err());
