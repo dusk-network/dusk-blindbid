@@ -266,22 +266,8 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dusk_plonk::jubjub::{
-        AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
-    };
-    use rand_core::RngCore;
-
-    pub(self) fn gen_val_blinder_and_commitment(
-    ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
-        let value = JubJubScalar::from(250_000u64);
-        let blinder = JubJubScalar::random(&mut rand::thread_rng());
-
-        let commitment: AffinePoint = AffinePoint::from(
-            &(GENERATOR_EXTENDED * value)
-                + &(GENERATOR_NUMS_EXTENDED * blinder),
-        );
-        (value, blinder, commitment)
-    }
+    use crate::bid::bid::tests::random_bid;
+    use dusk_plonk::jubjub::GENERATOR_EXTENDED;
 
     #[test]
     fn biguint_scalar_conversion() {
@@ -298,27 +284,11 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, _, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a correct Bid
-        let bid = &Bid {
-            bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-            consensus_round_seed: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_round: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_step: BlsScalar::random(&mut rand::thread_rng()),
-            elegibility_ts: rand::thread_rng().next_u32(),
-            expiration_ts: rand::thread_rng().next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
-            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
-            randomness: AffinePoint::identity(),
-            secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::default(),
-            pk: AffinePoint::identity(),
-            c: commitment,
-        }
-        .init(&value)?;
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let bid = random_bid(&secret);
+        let secret = GENERATOR_EXTENDED * &secret;
+        let (value, _) = bid.decrypt_data(&secret.into())?;
 
         // Proving
         let mut prover = Prover::new(b"testing");
@@ -342,27 +312,11 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, _, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a correct Bid
-        let mut bid = Bid {
-            bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-            consensus_round_seed: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_round: BlsScalar::random(&mut rand::thread_rng()),
-            latest_consensus_step: BlsScalar::random(&mut rand::thread_rng()),
-            elegibility_ts: rand::thread_rng().next_u32(),
-            expiration_ts: rand::thread_rng().next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-            encrypted_blinder: (AffinePoint::default(), AffinePoint::default()),
-            encrypted_value: (AffinePoint::default(), AffinePoint::default()),
-            randomness: AffinePoint::identity(),
-            secret_k: BlsScalar::random(&mut rand::thread_rng()),
-            hashed_secret: BlsScalar::default(),
-            pk: AffinePoint::identity(),
-            c: commitment,
-        }
-        .init(&value)?;
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let mut bid = random_bid(&secret);
+        let secret = GENERATOR_EXTENDED * &secret;
+        let (value, _) = bid.decrypt_data(&secret.into())?;
 
         // Edit score fields which should make the test fail
         let mut score = bid.score;

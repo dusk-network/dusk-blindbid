@@ -1,11 +1,22 @@
-//! Encoding module for Bid structure.
+//BlsScalar Encoding module for Bid structure.
 //!
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
 use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
+use poseidon252::cipher::PoseidonCipher;
 use poseidon252::{sponge::sponge::*, StorageScalar};
+
+// 1. Generate the type_fields Scalar Id:
+// Type 1 will be BlsScalar
+// Type 2 will be JubJubScalar
+// Type 3 will be JubJubAffine coordinates tuple
+// Type 4 will be u32
+// Type 5 will be PoseidonCipher
+// Byte-types are treated in Little Endian.
+// The purpose of this set of flags is to avoid collision between different structures
+const TYPE_FIELDS: [u8; 32] = *b"44513313000000000000000000000000";
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct StorageBid {
@@ -13,10 +24,9 @@ pub struct StorageBid {
     pub(crate) elegibility_ts: u32,
     // t_e
     pub(crate) expiration_ts: u32,
-    // b_enc (encrypted blinder)
-    pub(crate) encrypted_blinder: (AffinePoint, AffinePoint),
-    // v_enc (encrypted_value)
-    pub(crate) encrypted_value: (AffinePoint, AffinePoint),
+    // b_enc (encrypted value and blinder)
+    pub(crate) encrypted_data: PoseidonCipher,
+    pub(crate) nonce: BlsScalar,
     // R = r * G
     pub(crate) randomness: AffinePoint,
     // m
@@ -34,8 +44,8 @@ impl From<&Bid> for StorageBid {
         StorageBid {
             elegibility_ts: bid.elegibility_ts,
             expiration_ts: bid.expiration_ts,
-            encrypted_blinder: bid.encrypted_blinder,
-            encrypted_value: bid.encrypted_value,
+            encrypted_data: bid.encrypted_data,
+            nonce: bid.nonce,
             randomness: bid.randomness,
             hashed_secret: bid.hashed_secret,
             pk: bid.pk,
@@ -56,16 +66,8 @@ impl Into<StorageScalar> for StorageBid {
         // it. Therefore, any field that relies on it to be computed isn't
         // neither used to obtain this encoded form.
 
-        // 1. Generate the type_fields Scalar Id:
-        // Type 1 will be BlsScalar
-        // Type 2 will be JubJubScalar
-        // Type 3 will be JubJubAffine
-        // Type 4 will be u32
-        // Byte-types are treated in Little Endian.
-
         // Safe unwrap here.
-        let type_fields =
-            BlsScalar::from_bytes(b"44333313300000000000000000000000").unwrap();
+        let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
         words_deposit.push(type_fields);
 
         // 2. Encode each word.
@@ -74,11 +76,8 @@ impl Into<StorageScalar> for StorageBid {
         words_deposit.push(BlsScalar::from(self.elegibility_ts as u64));
         words_deposit.push(BlsScalar::from(self.expiration_ts as u64));
 
-        // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.encrypted_value.0.get_x());
-        words_deposit.push(self.encrypted_value.0.get_y());
-        words_deposit.push(self.encrypted_blinder.1.get_x());
-        words_deposit.push(self.encrypted_blinder.1.get_y());
+        // Push cipher as scalars.
+        words_deposit.extend_from_slice(self.encrypted_data.cipher());
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.pk.get_x());
@@ -116,8 +115,8 @@ impl StorageBid {
         // as the default one.
         // It has been already checked that it's safe to unwrap here since the
         // value fits correctly in a `BlsScalar`.
-        let type_fields =
-            BlsScalar::from_bytes(b"44333313300000000000000000000000").unwrap();
+        let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
+
         // Add to the composer the values required for the preimage.
         let mut messages: Vec<Variable> = vec![];
         messages.push(composer.add_input(type_fields));
@@ -128,10 +127,11 @@ impl StorageBid {
             composer.add_input(BlsScalar::from(self.expiration_ts as u64)),
         );
         // Push both JubJubAffine coordinates as a Scalar.
-        messages.push(composer.add_input(self.encrypted_value.0.get_x()));
-        messages.push(composer.add_input(self.encrypted_value.0.get_y()));
-        messages.push(composer.add_input(self.encrypted_blinder.1.get_x()));
-        messages.push(composer.add_input(self.encrypted_blinder.1.get_y()));
+        self.encrypted_data.cipher().iter().for_each(|c| {
+            let c = composer.add_input(*c);
+            messages.push(c);
+        });
+
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.pk.get_x()));
         messages.push(composer.add_input(self.pk.get_y()));
@@ -160,22 +160,8 @@ impl StorageBid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::score_gen::Score;
+    use crate::bid::bid::tests::random_bid;
     use anyhow::Result;
-    use dusk_plonk::jubjub::{GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
-    use rand_core::RngCore;
-
-    pub(self) fn gen_val_blinder_and_commitment(
-    ) -> (JubJubScalar, JubJubScalar, AffinePoint) {
-        let value = JubJubScalar::from(235_000u64);
-        let blinder = JubJubScalar::random(&mut rand::thread_rng());
-
-        let commitment: AffinePoint = AffinePoint::from(
-            &(GENERATOR_EXTENDED * value)
-                + &(GENERATOR_NUMS_EXTENDED * blinder),
-        );
-        (value, blinder, commitment)
-    }
 
     #[ignore]
     #[test]
@@ -191,43 +177,10 @@ mod tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
-        let (value, _, commitment) = gen_val_blinder_and_commitment();
-
         // Generate a correct Bid
-        let storage_bid =
-            StorageBid::from(
-                &Bid {
-                    bid_tree_root: BlsScalar::random(&mut rand::thread_rng()),
-                    consensus_round_seed: BlsScalar::random(
-                        &mut rand::thread_rng(),
-                    ),
-                    latest_consensus_round: BlsScalar::random(
-                        &mut rand::thread_rng(),
-                    ),
-                    latest_consensus_step: BlsScalar::random(
-                        &mut rand::thread_rng(),
-                    ),
-                    elegibility_ts: rand::thread_rng().next_u32(),
-                    expiration_ts: rand::thread_rng().next_u32(),
-                    prover_id: BlsScalar::default(),
-                    score: Score::default(),
-
-                    encrypted_blinder: (
-                        AffinePoint::default(),
-                        AffinePoint::default(),
-                    ),
-                    encrypted_value: (
-                        AffinePoint::default(),
-                        AffinePoint::default(),
-                    ),
-                    randomness: AffinePoint::identity(),
-                    secret_k: BlsScalar::random(&mut rand::thread_rng()),
-                    hashed_secret: BlsScalar::default(),
-                    pk: AffinePoint::identity(),
-                    c: commitment,
-                }
-                .init(&value)?,
-            );
+        let secret = JubJubScalar::random(&mut rand::thread_rng());
+        let bid = random_bid(&secret);
+        let storage_bid = StorageBid::from(&bid);
 
         // Proving
         let mut prover = Prover::new(b"testing");
