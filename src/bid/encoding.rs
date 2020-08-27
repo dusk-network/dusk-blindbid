@@ -1,4 +1,6 @@
-//BlsScalar Encoding module for Bid structure.
+// Copyright (c) DUSK NETWORK. All rights reserved.
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
+//!BlsScalar Encoding module for Bid structure.
 //!
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
