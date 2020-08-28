@@ -3,7 +3,7 @@
 use crate::bid::{Bid, StorageBid};
 use crate::score_gen::*;
 use anyhow::Result;
-use dusk_plonk::constraint_system::ecc::{curve_addition, scalar_mul};
+use dusk_plonk::constraint_system::ecc::scalar_mul::fixed_base::scalar_mul;
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
@@ -81,7 +81,7 @@ pub fn blind_bid_proof(
     let blinder = composer.add_input(blinder.into());
     let p1 = scalar_mul(composer, bid_value, GENERATOR_EXTENDED);
     let p2 = scalar_mul(composer, blinder, GENERATOR_NUMS_EXTENDED);
-    let computed_c = curve_addition(composer, p1.into(), p2.into());
+    let computed_c = p1.point().fast_add(composer, *p2.point());
     // Assert computed_commitment == announced commitment.
     composer.assert_equal_public_point(computed_c, bid.c);
 
