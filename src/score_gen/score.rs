@@ -8,9 +8,7 @@ use dusk_plonk::prelude::*;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use plonk_gadgets::{
-    AllocatedScalar,
-    RangeGadgets::{max_bound, range_check},
-    ScalarGadgets::maybe_equal,
+    AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
 use poseidon252::sponge::*;
 
@@ -109,7 +107,6 @@ pub fn prove_correct_score_gadget(
     let score_alloc_scalar =
         AllocatedScalar::allocate(composer, bid.score.score);
     let two_pow_128 = BlsScalar::from(2u64).pow(&[128, 0, 0, 0]);
-    let two_pow_128_buint = BigUint::from_bytes_le(&two_pow_128.to_bytes());
 
     // Allocate Bid fields needed for the gadget.
     let secret_k = AllocatedScalar::allocate(composer, bid.secret_k);
