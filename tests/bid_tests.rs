@@ -18,7 +18,7 @@ fn random_bid(
     let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
     let value = JubJubScalar::from(value);
 
-    Bid::init(
+    Bid::new(
         AffinePoint::from(secret),
         &mut rng,
         &value,

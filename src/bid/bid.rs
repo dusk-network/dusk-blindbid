@@ -28,7 +28,7 @@ pub struct Bid {
 }
 
 impl Bid {
-    pub fn init<R>(
+    pub fn new<R>(
         pk: AffinePoint,
         rng: &mut R,
         value: &JubJubScalar,

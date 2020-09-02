@@ -126,7 +126,7 @@ mod tests {
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
-        Bid::init(
+        Bid::new(
             AffinePoint::from(secret),
             &mut rng,
             &value,
