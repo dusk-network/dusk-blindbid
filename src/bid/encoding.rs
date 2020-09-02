@@ -5,9 +5,7 @@
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
-use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
-use poseidon252::cipher::PoseidonCipher;
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
 // 1. Generate the type_fields Scalar Id:
@@ -18,48 +16,12 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // Type 5 will be PoseidonCipher
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different structures
-const TYPE_FIELDS: [u8; 32] = *b"44513313000000000000000000000000";
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct StorageBid {
-    // t_a
-    pub(crate) elegibility_ts: u32,
-    // t_e
-    pub(crate) expiration_ts: u32,
-    // b_enc (encrypted value and blinder)
-    pub(crate) encrypted_data: PoseidonCipher,
-    pub(crate) nonce: BlsScalar,
-    // R = r * G
-    pub(crate) randomness: AffinePoint,
-    // m
-    pub(crate) hashed_secret: BlsScalar,
-    // pk (Public Key - Stealth Address)
-    pub(crate) pk: AffinePoint,
-    // c (Pedersen Commitment)
-    pub(crate) c: AffinePoint,
-}
-
-/// Encodes a `Bid` in a `StorageScalar` form by applying the correct encoding
-/// methods
-impl From<&Bid> for StorageBid {
-    fn from(bid: &Bid) -> StorageBid {
-        StorageBid {
-            elegibility_ts: bid.elegibility_ts,
-            expiration_ts: bid.expiration_ts,
-            encrypted_data: bid.encrypted_data,
-            nonce: bid.nonce,
-            randomness: bid.randomness,
-            hashed_secret: bid.hashed_secret,
-            pk: bid.pk,
-            c: bid.c,
-        }
-    }
-}
+const TYPE_FIELDS: [u8; 32] = *b"45133130000000000000000000000000";
 
 /// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct
 /// encoding methods and collapsing it into a `StorageScalar` which can be then
 /// stored inside of a `kelvin` tree data structure.
-impl Into<StorageScalar> for StorageBid {
+impl Into<StorageScalar> for Bid {
     fn into(self) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
@@ -73,11 +35,6 @@ impl Into<StorageScalar> for StorageBid {
         words_deposit.push(type_fields);
 
         // 2. Encode each word.
-        // Scalar and any other type that can be embedded in, will also be
-        // treated as one.
-        words_deposit.push(BlsScalar::from(self.elegibility_ts as u64));
-        words_deposit.push(BlsScalar::from(self.expiration_ts as u64));
-
         // Push cipher as scalars.
         words_deposit.extend_from_slice(self.encrypted_data.cipher());
 
@@ -102,7 +59,7 @@ impl Into<StorageScalar> for StorageBid {
     }
 }
 
-impl StorageBid {
+impl Bid {
     /// Applies a preimage_gadget to the `StorageBid` fields hashing them and
     /// constraining the result of the sponge hash to the real/expected
     /// `StorageBid` encoded value expressed as `Scalar/StorageScalar`.
@@ -122,12 +79,6 @@ impl StorageBid {
         // Add to the composer the values required for the preimage.
         let mut messages: Vec<Variable> = vec![];
         messages.push(composer.add_input(type_fields));
-        messages.push(
-            composer.add_input(BlsScalar::from(self.elegibility_ts as u64)),
-        );
-        messages.push(
-            composer.add_input(BlsScalar::from(self.expiration_ts as u64)),
-        );
         // Push both JubJubAffine coordinates as a Scalar.
         self.encrypted_data.cipher().iter().for_each(|c| {
             let c = composer.add_input(*c);
@@ -162,8 +113,27 @@ impl StorageBid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bid::bid::tests::random_bid;
-    use anyhow::Result;
+    use anyhow::{Error, Result};
+    use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
+    use rand::Rng;
+
+    fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
+        let mut rng = rand::thread_rng();
+
+        let secret_k = BlsScalar::random(&mut rng);
+        let secret = GENERATOR_EXTENDED * secret;
+        let value: u64 = (&mut rand::thread_rng())
+            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value = JubJubScalar::from(value);
+
+        Bid::init(
+            AffinePoint::from(secret),
+            &mut rng,
+            &value,
+            &AffinePoint::from(secret),
+            secret_k,
+        )
+    }
 
     #[ignore]
     #[test]
@@ -173,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_bid_preimage_gadget() -> Result<()> {
+    fn bid_preimage_gadget() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -181,18 +151,17 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret);
-        let storage_bid = StorageBid::from(&bid);
+        let bid = random_bid(&secret)?;
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        storage_bid.preimage_gadget(prover.mut_cs());
+        bid.preimage_gadget(prover.mut_cs());
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        storage_bid.preimage_gadget(verifier.mut_cs());
+        bid.preimage_gadget(verifier.mut_cs());
         verifier.preprocess(&ck)?;
         let pi = verifier.mut_cs().public_inputs.clone();
         verifier.verify(&proof, &vk, &pi)

@@ -15,33 +15,14 @@ use rand_core::{CryptoRng, RngCore};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
-    // B^R
-    pub(crate) bid_tree_root: BlsScalar,
-    // sigma^s
-    pub(crate) consensus_round_seed: BlsScalar,
-    // k^t
-    pub(crate) latest_consensus_round: BlsScalar,
-    // k^s
-    pub(crate) latest_consensus_step: BlsScalar,
-    // t_a
-    pub(crate) elegibility_ts: u32,
-    // t_e
-    pub(crate) expiration_ts: u32,
-    // i (One time identity of the prover)
-    pub(crate) prover_id: BlsScalar,
-    // q (Score of the bid)
-    pub(crate) score: Score,
-    // Encrypted value and blinding factor with the bidder key
+    // b_enc (encrypted value and blinder)
     pub(crate) encrypted_data: PoseidonCipher,
     pub(crate) nonce: BlsScalar,
-
     // R = r * G
     pub(crate) randomness: AffinePoint,
-    // k
-    pub(crate) secret_k: BlsScalar,
     // m
     pub(crate) hashed_secret: BlsScalar,
-    // pk (Public Key - Stealth Address)
+    // pk (Public Key - Stealth Address) // XXX: Likely to become pk_r
     pub(crate) pk: AffinePoint,
     // c (Pedersen Commitment)
     pub(crate) c: AffinePoint,
@@ -49,10 +30,11 @@ pub struct Bid {
 
 impl Bid {
     pub fn init<R>(
-        mut self,
+        pk: AffinePoint,
         rng: &mut R,
         value: &JubJubScalar,
         secret: &AffinePoint,
+        secret_k: BlsScalar,
     ) -> Result<Self, Error>
     where
         R: RngCore + CryptoRng,
@@ -78,18 +60,21 @@ impl Bid {
             }
             (false, false) => (),
             (_, _) => unreachable!(),
-        }
+        };
+        // Generate an empty Bid and fill it with the correct values
+        let mut bid = Bid::default();
+        bid.set_value(rng, value, secret);
 
-        self.set_value(rng, value, secret);
+        // Generate inner randomness for the Bid.
+        bid.randomness =
+            AffinePoint::from(GENERATOR_EXTENDED * JubJubScalar::random(rng));
+
+        // Assign `pk` to the Bid
+        bid.pk = pk;
 
         // Compute and add the `hashed_secret` to the Bid.
-        self.hashed_secret = sponge_hash(&[self.secret_k]);
-        // Compute and add to the Bid the `prover_id`.
-        self.generate_prover_id();
-        // Compute score and append it to the Bid.
-        self.score = compute_score(&self, value)?;
-
-        Ok(self)
+        bid.hashed_secret = sponge_hash(&[secret_k]);
+        Ok(bid)
     }
 
     pub(crate) fn set_value<R>(
@@ -118,13 +103,19 @@ impl Bid {
     ///
     /// The function performs the sponge_hash techniqe using poseidon to
     /// get the one-time prover_id and sets it in the Bid.
-    pub(crate) fn generate_prover_id(&mut self) {
-        self.prover_id = sponge_hash(&[
-            BlsScalar::from_bytes(&self.secret_k.to_bytes()).unwrap(),
-            self.consensus_round_seed,
-            self.latest_consensus_round,
-            self.latest_consensus_step,
-        ]);
+    pub(crate) fn generate_prover_id(
+        &self,
+        secret_k: BlsScalar,
+        consensus_round_seed: BlsScalar,
+        latest_consensus_round: BlsScalar,
+        latest_consensus_step: BlsScalar,
+    ) -> BlsScalar {
+        sponge_hash(&[
+            secret_k,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        ])
     }
 
     /// Decrypt the underlying data provided the secret of the bidder and return a tuple containing
@@ -157,42 +148,5 @@ impl Bid {
         //use crate::score_gen::score::prove_correct_score_gadget;
 
         unimplemented!()
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use rand::Rng;
-
-    pub fn random_bid(secret: &JubJubScalar) -> Bid {
-        let mut rng = rand::thread_rng();
-
-        let secret = GENERATOR_EXTENDED * secret;
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
-        let value = JubJubScalar::from(value);
-
-        let bid = Bid {
-            bid_tree_root: BlsScalar::random(&mut rng),
-            consensus_round_seed: BlsScalar::random(&mut rng),
-            latest_consensus_round: BlsScalar::random(&mut rng),
-            latest_consensus_step: BlsScalar::random(&mut rng),
-            elegibility_ts: rng.next_u32(),
-            expiration_ts: rng.next_u32(),
-            prover_id: BlsScalar::default(),
-            score: Score::default(),
-
-            encrypted_data: PoseidonCipher::default(),
-            nonce: BlsScalar::default(),
-            randomness: AffinePoint::identity(),
-
-            secret_k: BlsScalar::random(&mut rng),
-            hashed_secret: BlsScalar::default(),
-            pk: AffinePoint::identity(),
-            c: AffinePoint::default(),
-        };
-
-        bid.init(&mut rng, &value, &secret.into()).unwrap()
     }
 }
