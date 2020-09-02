@@ -6,6 +6,7 @@ use super::errors::ScoreError;
 use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
 use crate::bid::Bid;
 use anyhow::{Error, Result};
+use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
@@ -41,84 +42,86 @@ impl Score {
     }
 }
 
-/// Given a `Bid`, compute it's Score and return it.
-pub(crate) fn compute_score(
-    bid: &Bid,
-    bid_value: &JubJubScalar,
-) -> Result<Score, Error> {
-    // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
-    // latest_consensus_round, latest_consensus_step)`.
-    let y = sponge::sponge_hash(&[
-        bid.secret_k,
-        bid.bid_tree_root,
-        bid.consensus_round_seed,
-        bid.latest_consensus_round,
-        bid.latest_consensus_step,
-    ]);
+impl Bid {
+    /// Given a `Bid`, compute it's Score and return it.
+    pub fn compute_score(
+        &self,
+        secret: &AffinePoint,
+        secret_k: BlsScalar,
+        bid_tree_root: BlsScalar,
+        consensus_round_seed: BlsScalar,
+        latest_consensus_round: BlsScalar,
+        latest_consensus_step: BlsScalar,
+    ) -> Result<Score, Error> {
+        // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
+        // latest_consensus_round, latest_consensus_step)`.
+        let y = sponge::sponge_hash(&[
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        ]);
+        let (value, _) = self.decrypt_data(secret)?;
 
-    // Truncate Y to left 128 bits and interpret the result as 128-bit integer.
-    // Keep the right 128 bits as another integer (r1).
-    let r1 = BigUint::from_bytes_le(&y.to_bytes()[16..32]);
-    let y_prime = BigUint::from_bytes_le(&y.to_bytes()[0..16]);
+        // Truncate Y to left 128 bits and interpret the result as 128-bit integer.
+        // Keep the right 128 bits as another integer (r1).
+        let r1 = BigUint::from_bytes_le(&y.to_bytes()[16..32]);
+        let y_prime = BigUint::from_bytes_le(&y.to_bytes()[0..16]);
 
-    // Get the bid value outside of the modular field and treat it as
-    // an integer.
-    let bid_value = BigUint::from_bytes_le(&bid_value.to_bytes());
-    // Compute the final score
-    let (f, r2) = match y_prime == BigUint::zero() {
-        // If y' != 0 -> f = (bid_value * 2^128 / y')
-        // r2 is assigned to the remainder of the division.
-        false => {
-            let num = bid_value * (BigUint::one() << 128);
-            (&num / &y_prime, &num % &y_prime)
-        }
-        // If y' == 0 -> f = bid_value * 2^128
-        // Since there's not any division, r2 is assigned to 0 since
-        // there's not any remainder.
-        true => (bid_value * (BigUint::one() << 128), BigUint::zero()),
-    };
+        // Get the bid value outside of the modular field and treat it as
+        // an integer.
+        let bid_value = BigUint::from_bytes_le(&value.to_bytes());
+        // Compute the final score
+        let (f, r2) = match y_prime == BigUint::zero() {
+            // If y' != 0 -> f = (bid_value * 2^128 / y')
+            // r2 is assigned to the remainder of the division.
+            false => {
+                let num = bid_value * (BigUint::one() << 128);
+                (&num / &y_prime, &num % &y_prime)
+            }
+            // If y' == 0 -> f = bid_value * 2^128
+            // Since there's not any division, r2 is assigned to 0 since
+            // there's not any remainder.
+            true => (bid_value * (BigUint::one() << 128), BigUint::zero()),
+        };
 
-    // Get Scalars from the bigUints and return a `Score` if the conversions
-    // could be correctly done.
-    Ok(Score::new(
-        biguint_to_scalar(f)?,
-        y,
-        biguint_to_scalar(y_prime)?,
-        biguint_to_scalar(r1)?,
-        biguint_to_scalar(r2)?,
-    ))
+        // Get Scalars from the bigUints and return a `Score` if the conversions
+        // could be correctly done.
+        Ok(Score::new(
+            biguint_to_scalar(f)?,
+            y,
+            biguint_to_scalar(y_prime)?,
+            biguint_to_scalar(r1)?,
+            biguint_to_scalar(r2)?,
+        ))
+    }
 }
 
 /// Proves that a `Score` is correctly generated.
 /// Prints the proving statements in the passed Constraint System.
 pub fn prove_correct_score_gadget(
     composer: &mut StandardComposer,
-    bid: &Bid,
-    bid_value: Variable,
+    bid: Bid,
+    score: Score,
+    bid_value: AllocatedScalar,
+    secret_k: AllocatedScalar,
+    bid_tree_root: AllocatedScalar,
+    consensus_round_seed: AllocatedScalar,
+    latest_consensus_round: AllocatedScalar,
+    latest_consensus_step: AllocatedScalar,
 ) -> Result<(), Error> {
     // Allocate constant one & zero values.
-    let one = composer.add_input(BlsScalar::one());
-    composer.constrain_to_constant(one, BlsScalar::one(), BlsScalar::zero());
-    let zero = composer.add_input(BlsScalar::zero());
-    composer.constrain_to_constant(zero, BlsScalar::zero(), BlsScalar::zero());
+    let one = composer.add_witness_to_circuit_description(BlsScalar::one());
+    let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
     // Allocate Score fields needed for the gadget.
-    let r1 = AllocatedScalar::allocate(composer, bid.score.r1);
-    let r2 = AllocatedScalar::allocate(composer, bid.score.r2);
-    let y = AllocatedScalar::allocate(composer, bid.score.y);
-    let y_prime = AllocatedScalar::allocate(composer, bid.score.y_prime);
-    let score_alloc_scalar =
-        AllocatedScalar::allocate(composer, bid.score.score);
+    let r1 = AllocatedScalar::allocate(composer, score.r1);
+    let r2 = AllocatedScalar::allocate(composer, score.r2);
+    let y = AllocatedScalar::allocate(composer, score.y);
+    let y_prime = AllocatedScalar::allocate(composer, score.y_prime);
+    let score_alloc_scalar = AllocatedScalar::allocate(composer, score.score);
     let two_pow_128 = BlsScalar::from(2u64).pow(&[128, 0, 0, 0]);
 
-    // Allocate Bid fields needed for the gadget.
-    let secret_k = AllocatedScalar::allocate(composer, bid.secret_k);
-    let bid_tree_root = AllocatedScalar::allocate(composer, bid.bid_tree_root);
-    let consensus_round_seed =
-        AllocatedScalar::allocate(composer, bid.consensus_round_seed);
-    let latest_consensus_round =
-        AllocatedScalar::allocate(composer, bid.latest_consensus_round);
-    let latest_consensus_step =
-        AllocatedScalar::allocate(composer, bid.latest_consensus_step);
     // 1. y = H(k||H(Bi)||sigma^s||k^t||k^s)
     let should_be_y = sponge::sponge_hash_gadget(
         composer,
@@ -239,7 +242,7 @@ pub fn prove_correct_score_gadget(
     // (q*Y' + r2) - v*2^128 = 0
     composer.add_gate(
         left,
-        bid_value,
+        bid_value.var,
         zero,
         BlsScalar::one(),
         -two_pow_128,
@@ -265,8 +268,26 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bid::bid::tests::random_bid;
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
+    use rand::Rng;
+
+    fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
+        let mut rng = rand::thread_rng();
+
+        let secret_k = BlsScalar::random(&mut rng);
+        let secret = GENERATOR_EXTENDED * secret;
+        let value: u64 = (&mut rand::thread_rng())
+            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value = JubJubScalar::from(value);
+
+        Bid::init(
+            AffinePoint::from(secret),
+            &mut rng,
+            &value,
+            &AffinePoint::from(secret),
+            secret_k,
+        )
+    }
 
     #[test]
     fn biguint_scalar_conversion() {
@@ -274,6 +295,42 @@ mod tests {
         let big_uint = BigUint::from_bytes_le(&rand_scalar.to_bytes());
 
         assert_eq!(biguint_to_scalar(big_uint).unwrap(), rand_scalar)
+    }
+
+    fn allocate_fields(
+        composer: &mut StandardComposer,
+        value: JubJubScalar,
+        secret_k: BlsScalar,
+        bid_tree_root: BlsScalar,
+        consensus_round_seed: BlsScalar,
+        latest_consensus_round: BlsScalar,
+        latest_consensus_step: BlsScalar,
+    ) -> (
+        AllocatedScalar,
+        AllocatedScalar,
+        AllocatedScalar,
+        AllocatedScalar,
+        AllocatedScalar,
+        AllocatedScalar,
+    ) {
+        let value = AllocatedScalar::allocate(composer, value.into());
+
+        let secret_k = AllocatedScalar::allocate(composer, secret_k);
+        let bid_tree_root = AllocatedScalar::allocate(composer, bid_tree_root);
+        let consensus_round_seed =
+            AllocatedScalar::allocate(composer, consensus_round_seed);
+        let latest_consensus_round =
+            AllocatedScalar::allocate(composer, latest_consensus_round);
+        let latest_consensus_step =
+            AllocatedScalar::allocate(composer, latest_consensus_step);
+        (
+            value,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
     }
 
     #[test]
@@ -285,21 +342,90 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret);
+        let mut bid = random_bid(&secret)?;
         let secret = GENERATOR_EXTENDED * &secret;
         let (value, _) = bid.decrypt_data(&secret.into())?;
 
+        // Generate fields for the Bid & required by the compute_score
+        let secret_k = BlsScalar::random(&mut rand::thread_rng());
+        let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+
+        // Edit score fields which should make the test fail
+        let mut score = bid.compute_score(
+            &secret.into(),
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )?;
+
         // Proving
         let mut prover = Prover::new(b"testing");
-        let value_var = prover.mut_cs().add_input(value.into());
-        prove_correct_score_gadget(prover.mut_cs(), &bid, value_var)?;
+        // Allocate values
+        let (
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        ) = allocate_fields(
+            prover.mut_cs(),
+            value,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+        prove_correct_score_gadget(
+            prover.mut_cs(),
+            bid,
+            score,
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        )?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        let value_var = verifier.mut_cs().add_input(value.into());
-        prove_correct_score_gadget(verifier.mut_cs(), &bid, value_var)?;
+        // Allocate values
+        let (
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        ) = allocate_fields(
+            verifier.mut_cs(),
+            value,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+        prove_correct_score_gadget(
+            verifier.mut_cs(),
+            bid,
+            score,
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        );
         verifier.preprocess(&ck)?;
         verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
@@ -313,27 +439,92 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let mut bid = random_bid(&secret);
+        let mut bid = random_bid(&secret)?;
         let secret = GENERATOR_EXTENDED * &secret;
         let (value, _) = bid.decrypt_data(&secret.into())?;
 
+        // Generate fields for the Bid & required by the compute_score
+        let secret_k = BlsScalar::random(&mut rand::thread_rng());
+        let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+
         // Edit score fields which should make the test fail
-        let mut score = bid.score;
+        let mut score = bid.compute_score(
+            &secret.into(),
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )?;
         score.score = BlsScalar::from(5686536568u64);
         score.r1 = BlsScalar::from(5898956968u64);
-        bid.score = score;
 
         // Proving
         let mut prover = Prover::new(b"testing");
-        let value_var = prover.mut_cs().add_input(value.into());
-        prove_correct_score_gadget(prover.mut_cs(), &bid, value_var)?;
+        // Allocate values
+        let (
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        ) = allocate_fields(
+            prover.mut_cs(),
+            value,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+        prove_correct_score_gadget(
+            prover.mut_cs(),
+            bid,
+            score,
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        )?;
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
         // Verification
         let mut verifier = Verifier::new(b"testing");
-        let value_var = verifier.mut_cs().add_input(value.into());
-        prove_correct_score_gadget(verifier.mut_cs(), &bid, value_var)?;
+        // Allocate values
+        let (
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        ) = allocate_fields(
+            verifier.mut_cs(),
+            value,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+        prove_correct_score_gadget(
+            verifier.mut_cs(),
+            bid,
+            score,
+            alloc_value,
+            alloc_secret_k,
+            alloc_bid_tree_root,
+            alloc_consensus_round_seed,
+            alloc_latest_consensus_round,
+            alloc_latest_consensus_step,
+        );
         verifier.preprocess(&ck)?;
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])

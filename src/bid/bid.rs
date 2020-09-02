@@ -3,7 +3,7 @@
 //! Bid data structure
 
 use super::BidGenerationError;
-use crate::score_gen::{compute_score, Score};
+use crate::score_gen::Score;
 use anyhow::{Error, Result};
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
