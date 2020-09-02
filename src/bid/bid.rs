@@ -3,7 +3,6 @@
 //! Bid data structure
 
 use super::BidGenerationError;
-use crate::score_gen::Score;
 use anyhow::{Error, Result};
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
@@ -16,16 +15,16 @@ use rand_core::{CryptoRng, RngCore};
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bid {
     // b_enc (encrypted value and blinder)
-    pub(crate) encrypted_data: PoseidonCipher,
-    pub(crate) nonce: BlsScalar,
+    pub encrypted_data: PoseidonCipher,
+    pub nonce: BlsScalar,
     // R = r * G
-    pub(crate) randomness: AffinePoint,
+    pub randomness: AffinePoint,
     // m
-    pub(crate) hashed_secret: BlsScalar,
+    pub hashed_secret: BlsScalar,
     // pk (Public Key - Stealth Address) // XXX: Likely to become pk_r
-    pub(crate) pk: AffinePoint,
+    pub pk: AffinePoint,
     // c (Pedersen Commitment)
-    pub(crate) c: AffinePoint,
+    pub c: AffinePoint,
 }
 
 impl Bid {

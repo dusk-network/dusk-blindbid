@@ -17,7 +17,7 @@ use poseidon252::sponge::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub struct Score {
-    pub(crate) score: BlsScalar,
+    pub score: BlsScalar,
     pub(crate) y: BlsScalar,
     pub(crate) y_prime: BlsScalar,
     pub(crate) r1: BlsScalar,
@@ -102,7 +102,6 @@ impl Bid {
 /// Prints the proving statements in the passed Constraint System.
 pub fn prove_correct_score_gadget(
     composer: &mut StandardComposer,
-    bid: Bid,
     score: Score,
     bid_value: AllocatedScalar,
     secret_k: AllocatedScalar,
@@ -342,7 +341,7 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let mut bid = random_bid(&secret)?;
+        let bid = random_bid(&secret)?;
         let secret = GENERATOR_EXTENDED * &secret;
         let (value, _) = bid.decrypt_data(&secret.into())?;
 
@@ -354,7 +353,7 @@ mod tests {
         let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
 
         // Edit score fields which should make the test fail
-        let mut score = bid.compute_score(
+        let score = bid.compute_score(
             &secret.into(),
             secret_k,
             bid_tree_root,
@@ -384,7 +383,6 @@ mod tests {
         );
         prove_correct_score_gadget(
             prover.mut_cs(),
-            bid,
             score,
             alloc_value,
             alloc_secret_k,
@@ -417,7 +415,6 @@ mod tests {
         );
         prove_correct_score_gadget(
             verifier.mut_cs(),
-            bid,
             score,
             alloc_value,
             alloc_secret_k,
@@ -425,7 +422,7 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        );
+        )?;
         verifier.preprocess(&ck)?;
         verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
@@ -439,7 +436,7 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let mut bid = random_bid(&secret)?;
+        let bid = random_bid(&secret)?;
         let secret = GENERATOR_EXTENDED * &secret;
         let (value, _) = bid.decrypt_data(&secret.into())?;
 
@@ -483,7 +480,6 @@ mod tests {
         );
         prove_correct_score_gadget(
             prover.mut_cs(),
-            bid,
             score,
             alloc_value,
             alloc_secret_k,
@@ -516,7 +512,6 @@ mod tests {
         );
         prove_correct_score_gadget(
             verifier.mut_cs(),
-            bid,
             score,
             alloc_value,
             alloc_secret_k,
@@ -524,7 +519,7 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        );
+        )?;
         verifier.preprocess(&ck)?;
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])
