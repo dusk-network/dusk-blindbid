@@ -143,8 +143,8 @@ mod tests {
         stealth_addr_buff[0..32].copy_from_slice(&pk_r.to_bytes()[..]);
         stealth_addr_buff[32..].copy_from_slice(&R.to_bytes()[..]);
         let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
-        let elegibility_ts = BlsScalar::random(&mut rng);
-        let expiration_ts = BlsScalar::random(&mut rng);
+        let elegibility_ts = -BlsScalar::one();
+        let expiration_ts = -BlsScalar::one();
 
         Bid::new(
             &mut rng,
