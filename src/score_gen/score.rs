@@ -53,6 +53,9 @@ impl Bid {
         latest_consensus_round: BlsScalar,
         latest_consensus_step: BlsScalar,
     ) -> Result<Score, Error> {
+        if latest_consensus_round.reduce() > self.expiration_ts.reduce() {
+            return Err(ScoreError::ExpiredBid.into());
+        };
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
         // latest_consensus_round, latest_consensus_step)`.
         let y = sponge::sponge_hash(&[
