@@ -13,6 +13,7 @@ use dusk_plonk::prelude::*;
 use plonk_gadgets::{
     AllocatedScalar,
     RangeGadgets::{max_bound, range_check},
+    ScalarGadgets::conditionally_select_one,
 };
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
@@ -30,8 +31,6 @@ pub fn blind_bid_proof(
     latest_consensus_step: BlsScalar,
     latest_consensus_round: BlsScalar,
     seed: BlsScalar,
-    elegibility_ts: BlsScalar,
-    expiration_ts: BlsScalar,
 ) -> Result<()> {
     // Generate constant witness values for 0.
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -45,8 +44,9 @@ pub fn blind_bid_proof(
         AllocatedScalar::allocate(composer, latest_consensus_step);
     let latest_consensus_round =
         AllocatedScalar::allocate(composer, latest_consensus_round);
-    let elegibility_ts = AllocatedScalar::allocate(composer, elegibility_ts);
-    let expiration_ts = AllocatedScalar::allocate(composer, expiration_ts);
+    let elegibility_ts =
+        AllocatedScalar::allocate(composer, bid.elegibility_ts);
+    let expiration_ts = AllocatedScalar::allocate(composer, bid.expiration_ts);
     // Allocate the bid tree root to be used later by the score_generation
     // gadget.
     let bid_tree_root = AllocatedScalar::allocate(composer, branch.root);
@@ -68,14 +68,17 @@ pub fn blind_bid_proof(
     // 3. k_t <= t_a
     let third_cond = range_check(
         composer,
-        latest_consensus_step.scalar,
+        latest_consensus_round.scalar,
         -BlsScalar::one(),
         elegibility_ts,
     ); // XXX: Does t_a have a max?
 
-    // 4. t_e <= k_t
+    // 4. t_e >= k_t
     let fourth_cond =
-        max_bound(composer, latest_consensus_step.scalar, expiration_ts).0;
+        max_bound(composer, latest_consensus_round.scalar, expiration_ts).0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
+    // Therefore we conditionally select one.
+    let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
     // Constraint third and fourth conditions to be true.
     // So basically, that the rangeproofs hold.
     composer.poly_gate(
