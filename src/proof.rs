@@ -119,7 +119,8 @@ pub fn blind_bid_proof(
         -bid.hashed_secret,
     );
 
-    // XXX: Check this not used anywhere else.
+    // We generate the prover_id and constrain it to a public input
+    // On that way we bind the Score to the correct id.
     // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
     let prover_id = sponge_hash_gadget(
         composer,
@@ -131,11 +132,16 @@ pub fn blind_bid_proof(
         ],
     );
     // Seems that there's no need to constrain that, just compute the value which is never used later on.
-    /*composer.constrain_to_constant(
+    composer.constrain_to_constant(
         prover_id,
         BlsScalar::zero(),
-        -bid.prover_id,
-    );*/
+        -bid.generate_prover_id(
+            secret_k.scalar,
+            seed.scalar,
+            latest_consensus_round.scalar,
+            latest_consensus_step.scalar,
+        ),
+    );
     // 9. Score generation circuit check with the corresponding gadget.
     prove_correct_score_gadget(
         composer,
