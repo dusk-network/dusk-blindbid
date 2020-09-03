@@ -7,6 +7,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.0"
+dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", branch = "fix_err"}
 dusk-plonk = {version = "0.2.8", features = ["trace-print"]}
 poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.2"}
 kelvin = "0.13.0"
