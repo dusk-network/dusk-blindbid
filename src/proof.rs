@@ -65,13 +65,18 @@ pub fn blind_bid_proof(
     merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
     // 2. Bid pre_image check
     bid.preimage_gadget(composer);
-    // 3. k_t <= t_a
+    // 3. t_a >= k_t
     let third_cond = range_check(
         composer,
         latest_consensus_round.scalar,
         -BlsScalar::one(),
         elegibility_ts,
-    ); // XXX: Does t_a have a max?
+    ); // XXX: Check if we can use the formula below.
+    composer.constrain_to_constant(
+        third_cond,
+        BlsScalar::one(),
+        BlsScalar::zero(),
+    );
 
     // 4. t_e >= k_t
     let fourth_cond =
@@ -81,15 +86,9 @@ pub fn blind_bid_proof(
     let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
     // Constraint third and fourth conditions to be true.
     // So basically, that the rangeproofs hold.
-    composer.poly_gate(
-        third_cond,
+    composer.constrain_to_constant(
         fourth_cond,
-        zero,
         BlsScalar::one(),
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-        BlsScalar::zero(),
         BlsScalar::zero(),
     );
 
