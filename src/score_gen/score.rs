@@ -293,8 +293,8 @@ mod tests {
         stealth_addr_buff[0..32].copy_from_slice(&pk_r.to_bytes()[..]);
         stealth_addr_buff[32..].copy_from_slice(&R.to_bytes()[..]);
         let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
-        let elegibility_ts = BlsScalar::random(&mut rng);
-        let expiration_ts = BlsScalar::random(&mut rng);
+        let elegibility_ts = -BlsScalar::one();
+        let expiration_ts = -BlsScalar::one();
 
         Bid::new(
             &mut rng,
@@ -368,8 +368,10 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        // Set latest consensus round as the max value so the score gen does not fail
+        // for that but for the proof verification error if that's the case
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::from(2u64);
 
         // Edit score fields which should make the test fail
         let score = bid.compute_score(
@@ -463,8 +465,10 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        // Set the timestamps to the maximum possible value so the generation of the
+        // score does not fail for that reason but for the proof verification.
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::from(2u64);
 
         // Edit score fields which should make the test fail
         let mut score = bid.compute_score(

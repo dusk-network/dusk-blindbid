@@ -31,8 +31,8 @@ fn random_bid(
     let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
     // Set the timestamps as the max values so the proofs do not fail for them
     // (never expired or non-elegible).
-    let elegibility_ts = -BlsScalar::one();
-    let expiration_ts = -BlsScalar::one();
+    let elegibility_ts = -BlsScalar::from(90u64);
+    let expiration_ts = -BlsScalar::from(90u64);
 
     Bid::new(
         &mut rng,
@@ -67,9 +67,8 @@ mod tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_round = BlsScalar::from(50u64);
         let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
 
         // Append the StorageBid as an StorageScalar to the tree.
@@ -84,7 +83,7 @@ mod tests {
         let score = bid.compute_score(
             &secret,
             secret_k,
-            bid_tree_root,
+            branch.root,
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -103,7 +102,6 @@ mod tests {
             latest_consensus_round,
             consensus_round_seed,
         )?;
-
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -142,7 +140,6 @@ mod tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
@@ -159,7 +156,7 @@ mod tests {
         let mut score = bid.compute_score(
             &secret,
             secret_k,
-            bid_tree_root,
+            branch.root,
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -313,7 +310,7 @@ mod tests {
         stealth_addr_buff[0..32].copy_from_slice(&pk_r.to_bytes()[..]);
         stealth_addr_buff[32..].copy_from_slice(&R.to_bytes()[..]);
         let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
-        let expiration_ts = BlsScalar::from(95u64);
+        let expiration_ts = BlsScalar::from(100u64);
         let elegibility_ts = BlsScalar::from(1000u64);
         let bid = Bid::new(
             &mut rng,
@@ -333,9 +330,9 @@ mod tests {
             .poseidon_branch(0u64)?
             .expect("Poseidon Branch Extraction");
 
-        // Latest consensus step should be lower than the expiration_ts, in this case is not
-        // so the proof should fail sincethe Bid expired.
-        let latest_consensus_round = BlsScalar::from(90u64);
+        // We first generate the score as if the bid wasn't expired. Otherways
+        // the score generation would fail since the Bid would be expired.
+        let latest_consensus_round = BlsScalar::from(3u64);
         let latest_consensus_step = BlsScalar::one();
         let consensus_round_seed = BlsScalar::random(&mut rng);
 
@@ -348,6 +345,10 @@ mod tests {
             latest_consensus_round,
             latest_consensus_step,
         )?;
+
+        // Latest consensus step should be lower than the expiration_ts, in this case is not
+        // so the proof should fail since the Bid is expired at this round.
+        let latest_consensus_round = BlsScalar::from(200u64);
 
         // Proving
         let mut prover = Prover::new(b"testing");
@@ -416,7 +417,7 @@ mod tests {
         stealth_addr_buff[0..32].copy_from_slice(&pk_r.to_bytes()[..]);
         stealth_addr_buff[32..].copy_from_slice(&R.to_bytes()[..]);
         let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
-        let expiration_ts = BlsScalar::from(120u64);
+        let expiration_ts = BlsScalar::from(100u64);
         let elegibility_ts = BlsScalar::from(1000u64);
         let bid = Bid::new(
             &mut rng,
@@ -436,9 +437,9 @@ mod tests {
             .poseidon_branch(0u64)?
             .expect("Poseidon Branch Extraction");
 
-        // Latest consensus step should be lower than the elegibility_ts, in this case is not
-        // so the proof should fail since the Bid is non elegible anymore.
-        let latest_consensus_round = BlsScalar::from(90u64);
+        // We first generate the score as if the bid was still eligible. Otherways
+        // the score generation would fail since the Bid wouldn't be elegible.
+        let latest_consensus_round = BlsScalar::from(3u64);
         let latest_consensus_step = BlsScalar::one();
         let consensus_round_seed = BlsScalar::random(&mut rng);
 
@@ -451,6 +452,10 @@ mod tests {
             latest_consensus_round,
             latest_consensus_step,
         )?;
+
+        // Latest consensus step should be lower than the elegibility_ts, in this case is not
+        // so the proof should fail since the Bid is non elegible anymore.
+        let latest_consensus_round = BlsScalar::from(200u64);
 
         // Proving
         let mut prover = Prover::new(b"testing");
