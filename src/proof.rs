@@ -65,13 +65,15 @@ pub fn blind_bid_proof(
     merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
     // 2. Bid pre_image check
     bid.preimage_gadget(composer);
+
     // 3. t_a >= k_t
-    let third_cond = range_check(
-        composer,
-        latest_consensus_round.scalar,
-        -BlsScalar::one(),
-        elegibility_ts,
-    ); // XXX: Check if we can use the formula below.
+    let third_cond =
+        max_bound(composer, latest_consensus_round.scalar, elegibility_ts).0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
+    // Therefore we conditionally select one.
+    let third_cond = conditionally_select_one(composer, zero, third_cond);
+    // Constraint third condition to be true.
+    // So basically, that the rangeproofs hold.
     composer.constrain_to_constant(
         third_cond,
         BlsScalar::one(),
@@ -84,7 +86,7 @@ pub fn blind_bid_proof(
     // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
     // Therefore we conditionally select one.
     let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
-    // Constraint third and fourth conditions to be true.
+    // Constraint fourth condition to be true.
     // So basically, that the rangeproofs hold.
     composer.constrain_to_constant(
         fourth_cond,
@@ -133,7 +135,6 @@ pub fn blind_bid_proof(
             latest_consensus_step.var,
         ],
     );
-    // Seems that there's no need to constrain that, just compute the value which is never used later on.
     composer.constrain_to_constant(
         prover_id,
         BlsScalar::zero(),
