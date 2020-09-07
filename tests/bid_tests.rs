@@ -2,7 +2,6 @@
 use anyhow::{Error, Result};
 use blind_bid::bid::Bid;
 use blind_bid::proof::blind_bid_proof;
-use dusk_pki::StealthAddress;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;

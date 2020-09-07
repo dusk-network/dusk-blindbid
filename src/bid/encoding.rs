@@ -120,10 +120,9 @@ impl Bid {
 mod tests {
     use super::*;
     use anyhow::{Error, Result};
-    use dusk_pki::{PublicSpendKey, SecretSpendKey, StealthAddress};
-    use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
+    use dusk_pki::{PublicSpendKey, SecretSpendKey};
+    use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use rand::Rng;
-    use std::convert::TryFrom;
 
     fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
         let mut rng = rand::thread_rng();
