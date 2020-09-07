@@ -16,7 +16,7 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // Type 5 will be PoseidonCipher
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different structures
-const TYPE_FIELDS: [u8; 32] = *b"45133130000000000000000000000000";
+const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
 
 /// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct
 /// encoding methods and collapsing it into a `StorageScalar` which can be then
@@ -39,18 +39,21 @@ impl Into<StorageScalar> for Bid {
         words_deposit.extend_from_slice(self.encrypted_data.cipher());
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.pk.get_x());
-        words_deposit.push(self.pk.get_y());
+        words_deposit.push(self.stealth_address.pk_r().get_x());
+        words_deposit.push(self.stealth_address.pk_r().get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.randomness.get_x());
-        words_deposit.push(self.randomness.get_y());
+        words_deposit.push(self.stealth_address.R().get_x());
+        words_deposit.push(self.stealth_address.R().get_y());
 
         words_deposit.push(self.hashed_secret);
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.push(self.c.get_x());
         words_deposit.push(self.c.get_y());
+        // Push the timestamps of the Bid
+        words_deposit.push(self.elegibility_ts);
+        words_deposit.push(self.expiration_ts);
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
@@ -86,15 +89,18 @@ impl Bid {
         });
 
         // Push both JubJubAffine coordinates as a Scalar.
-        messages.push(composer.add_input(self.pk.get_x()));
-        messages.push(composer.add_input(self.pk.get_y()));
+        messages.push(composer.add_input(self.stealth_address.pk_r().get_x()));
+        messages.push(composer.add_input(self.stealth_address.pk_r().get_y()));
         // Push both JubJubAffine coordinates as a Scalar.
-        messages.push(composer.add_input(self.randomness.get_x()));
-        messages.push(composer.add_input(self.randomness.get_y()));
+        messages.push(composer.add_input(self.stealth_address.R().get_x()));
+        messages.push(composer.add_input(self.stealth_address.R().get_y()));
         messages.push(composer.add_input(self.hashed_secret));
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.c.get_x()));
         messages.push(composer.add_input(self.c.get_y()));
+        // Add elebility & expiration timestamps.
+        messages.push(composer.add_input(self.elegibility_ts));
+        messages.push(composer.add_input(self.expiration_ts));
 
         // Perform the sponge_hash inside of the Constraint System
         let storage_bid_hash = sponge_hash_gadget(composer, &messages);
@@ -114,24 +120,33 @@ impl Bid {
 mod tests {
     use super::*;
     use anyhow::{Error, Result};
+    use dusk_pki::{PublicSpendKey, SecretSpendKey, StealthAddress};
     use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
     use rand::Rng;
+    use std::convert::TryFrom;
 
     fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
+        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
+        let elegibility_ts = -BlsScalar::one();
+        let expiration_ts = -BlsScalar::one();
+
         Bid::new(
-            AffinePoint::from(secret),
             &mut rng,
+            &stealth_addr,
             &value,
-            &AffinePoint::from(secret),
+            &secret.into(),
             secret_k,
+            elegibility_ts,
+            expiration_ts,
         )
     }
 

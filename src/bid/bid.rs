@@ -4,6 +4,7 @@
 
 use super::BidGenerationError;
 use anyhow::{Error, Result};
+use dusk_pki::{Ownable, StealthAddress};
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
@@ -12,28 +13,39 @@ use poseidon252::cipher::PoseidonCipher;
 use poseidon252::sponge::sponge::sponge_hash;
 use rand_core::{CryptoRng, RngCore};
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct Bid {
     // b_enc (encrypted value and blinder)
     pub encrypted_data: PoseidonCipher,
+    // Nonce used by the cypher
     pub nonce: BlsScalar,
-    // R = r * G
-    pub randomness: AffinePoint,
+    // Stealth address of the bidder
+    pub stealth_address: StealthAddress,
     // m
     pub hashed_secret: BlsScalar,
-    // pk (Public Key - Stealth Address) // XXX: Likely to become pk_r
-    pub pk: AffinePoint,
     // c (Pedersen Commitment)
     pub c: AffinePoint,
+    // Elegibility timestamp
+    pub elegibility_ts: BlsScalar,
+    // Expiration timestamp
+    pub expiration_ts: BlsScalar,
+}
+
+impl Ownable for Bid {
+    fn stealth_address(&self) -> &StealthAddress {
+        &self.stealth_address
+    }
 }
 
 impl Bid {
     pub fn new<R>(
-        pk: AffinePoint,
         rng: &mut R,
+        stealth_address: &StealthAddress,
         value: &JubJubScalar,
         secret: &AffinePoint,
         secret_k: BlsScalar,
+        elegibility_ts: BlsScalar,
+        expiration_ts: BlsScalar,
     ) -> Result<Self, Error>
     where
         R: RngCore + CryptoRng,
@@ -61,18 +73,19 @@ impl Bid {
             (_, _) => unreachable!(),
         };
         // Generate an empty Bid and fill it with the correct values
-        let mut bid = Bid::default();
+        let mut bid = Bid {
+            // Compute and add the `hashed_secret` to the Bid.
+            hashed_secret: sponge_hash(&[secret_k]),
+            elegibility_ts,
+            expiration_ts,
+            c: AffinePoint::default(),
+            stealth_address: *stealth_address,
+            encrypted_data: PoseidonCipher::default(),
+            nonce: BlsScalar::default(),
+        };
+
         bid.set_value(rng, value, secret);
 
-        // Generate inner randomness for the Bid.
-        bid.randomness =
-            AffinePoint::from(GENERATOR_EXTENDED * JubJubScalar::random(rng));
-
-        // Assign `pk` to the Bid
-        bid.pk = pk;
-
-        // Compute and add the `hashed_secret` to the Bid.
-        bid.hashed_secret = sponge_hash(&[secret_k]);
         Ok(bid)
     }
 

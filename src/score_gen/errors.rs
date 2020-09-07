@@ -11,4 +11,8 @@ pub enum ScoreError {
     /// fit inside a `Scalar`.
     #[error("score results do not fit inside of Scalar")]
     InvalidScoreFieldsLen,
+    /// Error that happens when you try to generate a `Score` for a `Bid`
+    /// has already expired.
+    #[error("the bid has already expired")]
+    ExpiredBid,
 }

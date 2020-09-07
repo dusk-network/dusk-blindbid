@@ -53,6 +53,9 @@ impl Bid {
         latest_consensus_round: BlsScalar,
         latest_consensus_step: BlsScalar,
     ) -> Result<Score, Error> {
+        if latest_consensus_round.reduce() > self.expiration_ts.reduce() {
+            return Err(ScoreError::ExpiredBid.into());
+        };
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
         // latest_consensus_round, latest_consensus_step)`.
         let y = sponge::sponge_hash(&[
@@ -267,6 +270,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use rand::Rng;
 
@@ -274,17 +278,23 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
+        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
+        let elegibility_ts = -BlsScalar::one();
+        let expiration_ts = -BlsScalar::one();
 
         Bid::new(
-            AffinePoint::from(secret),
             &mut rng,
+            &stealth_addr,
             &value,
-            &AffinePoint::from(secret),
+            &secret.into(),
             secret_k,
+            elegibility_ts,
+            expiration_ts,
         )
     }
 
@@ -349,8 +359,10 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        // Set latest consensus round as the max value so the score gen does not fail
+        // for that but for the proof verification error if that's the case
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::from(2u64);
 
         // Edit score fields which should make the test fail
         let score = bid.compute_score(
@@ -444,8 +456,10 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        // Set the timestamps to the maximum possible value so the generation of the
+        // score does not fail for that reason but for the proof verification.
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::from(2u64);
 
         // Edit score fields which should make the test fail
         let mut score = bid.compute_score(

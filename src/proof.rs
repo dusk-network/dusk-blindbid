@@ -13,6 +13,7 @@ use dusk_plonk::prelude::*;
 use plonk_gadgets::{
     AllocatedScalar,
     RangeGadgets::{max_bound, range_check},
+    ScalarGadgets::conditionally_select_one,
 };
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
@@ -30,8 +31,6 @@ pub fn blind_bid_proof(
     latest_consensus_step: BlsScalar,
     latest_consensus_round: BlsScalar,
     seed: BlsScalar,
-    elegibility_ts: BlsScalar,
-    expiration_ts: BlsScalar,
 ) -> Result<()> {
     // Generate constant witness values for 0.
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -45,8 +44,9 @@ pub fn blind_bid_proof(
         AllocatedScalar::allocate(composer, latest_consensus_step);
     let latest_consensus_round =
         AllocatedScalar::allocate(composer, latest_consensus_round);
-    let elegibility_ts = AllocatedScalar::allocate(composer, elegibility_ts);
-    let expiration_ts = AllocatedScalar::allocate(composer, expiration_ts);
+    let elegibility_ts =
+        AllocatedScalar::allocate(composer, bid.elegibility_ts);
+    let expiration_ts = AllocatedScalar::allocate(composer, bid.expiration_ts);
     // Allocate the bid tree root to be used later by the score_generation
     // gadget.
     let bid_tree_root = AllocatedScalar::allocate(composer, branch.root);
@@ -65,28 +65,32 @@ pub fn blind_bid_proof(
     merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
     // 2. Bid pre_image check
     bid.preimage_gadget(composer);
-    // 3. k_t <= t_a
-    let third_cond = range_check(
-        composer,
-        latest_consensus_step.scalar,
-        -BlsScalar::one(),
-        elegibility_ts,
-    ); // XXX: Does t_a have a max?
 
-    // 4. t_e <= k_t
-    let fourth_cond =
-        max_bound(composer, latest_consensus_step.scalar, expiration_ts).0;
-    // Constraint third and fourth conditions to be true.
+    // 3. t_a >= k_t
+    let third_cond =
+        max_bound(composer, latest_consensus_round.scalar, elegibility_ts).0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
+    // Therefore we conditionally select one.
+    let third_cond = conditionally_select_one(composer, zero, third_cond);
+    // Constraint third condition to be true.
     // So basically, that the rangeproofs hold.
-    composer.poly_gate(
+    composer.constrain_to_constant(
         third_cond,
-        fourth_cond,
-        zero,
         BlsScalar::one(),
         BlsScalar::zero(),
-        BlsScalar::zero(),
-        BlsScalar::zero(),
-        BlsScalar::zero(),
+    );
+
+    // 4. t_e >= k_t
+    let fourth_cond =
+        max_bound(composer, latest_consensus_round.scalar, expiration_ts).0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
+    // Therefore we conditionally select one.
+    let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
+    // Constraint fourth condition to be true.
+    // So basically, that the rangeproofs hold.
+    composer.constrain_to_constant(
+        fourth_cond,
+        BlsScalar::one(),
         BlsScalar::zero(),
     );
 
@@ -119,7 +123,8 @@ pub fn blind_bid_proof(
         -bid.hashed_secret,
     );
 
-    // XXX: Check this not used anywhere else.
+    // We generate the prover_id and constrain it to a public input
+    // On that way we bind the Score to the correct id.
     // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
     let prover_id = sponge_hash_gadget(
         composer,
@@ -130,12 +135,16 @@ pub fn blind_bid_proof(
             latest_consensus_step.var,
         ],
     );
-    // Seems that there's no need to constrain that, just compute the value which is never used later on.
-    /*composer.constrain_to_constant(
+    composer.constrain_to_constant(
         prover_id,
         BlsScalar::zero(),
-        -bid.prover_id,
-    );*/
+        -bid.generate_prover_id(
+            secret_k.scalar,
+            seed.scalar,
+            latest_consensus_round.scalar,
+            latest_consensus_step.scalar,
+        ),
+    );
     // 9. Score generation circuit check with the corresponding gadget.
     prove_correct_score_gadget(
         composer,
