@@ -120,7 +120,7 @@ impl Bid {
 mod tests {
     use super::*;
     use anyhow::{Error, Result};
-    use dusk_pki::StealthAddress;
+    use dusk_pki::{PublicSpendKey, SecretSpendKey, StealthAddress};
     use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
     use rand::Rng;
     use std::convert::TryFrom;
@@ -129,20 +129,13 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
+        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
-        let pk_r = AffinePoint::from(
-            GENERATOR_EXTENDED * JubJubScalar::random(&mut rng),
-        );
-        let R = AffinePoint::from(
-            GENERATOR_EXTENDED * JubJubScalar::random(&mut rng),
-        );
-        let mut stealth_addr_buff = [0u8; 64];
-        stealth_addr_buff[0..32].copy_from_slice(&pk_r.to_bytes()[..]);
-        stealth_addr_buff[32..].copy_from_slice(&R.to_bytes()[..]);
-        let stealth_addr = StealthAddress::try_from(&stealth_addr_buff)?;
+
         let elegibility_ts = -BlsScalar::one();
         let expiration_ts = -BlsScalar::one();
 
