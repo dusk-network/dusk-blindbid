@@ -172,7 +172,7 @@ impl Bid {
         buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
         buf[224..256].copy_from_slice(&self.c.to_bytes());
         buf[256..288].copy_from_slice(&self.elegibility_ts.to_bytes());
-        buf[288..310].copy_from_slice(&self.expiration_ts.to_bytes());
+        buf[288..320].copy_from_slice(&self.expiration_ts.to_bytes());
         buf
     }
 
@@ -181,7 +181,7 @@ impl Bid {
     // see issue #57563 <https://github.com/rust-lang/rust/issues/57563>
     /// Given the byte-representation of a `Bid`, generate one instance of it.
     pub fn from_bytes(bytes: [u8; BID_SIZE]) -> io::Result<Bid> {
-        let mut one_cipher = [0u8; 96];
+        let mut one_cipher = [0u8; ENCRYPTED_DATA_SIZE];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
 
@@ -206,7 +206,7 @@ impl Bid {
         one_scalar[..].copy_from_slice(&bytes[256..288]);
         let elegibility_ts = read_scalar(&one_scalar)?;
 
-        one_scalar[..].copy_from_slice(&bytes[288..310]);
+        one_scalar[..].copy_from_slice(&bytes[288..320]);
         let expiration_ts = read_scalar(&one_scalar)?;
 
         Ok(Bid {
