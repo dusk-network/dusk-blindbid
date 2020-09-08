@@ -11,8 +11,7 @@ use dusk_plonk::jubjub::{
 };
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{
-    AllocatedScalar,
-    RangeGadgets::{max_bound, range_check},
+    AllocatedScalar, RangeGadgets::max_bound,
     ScalarGadgets::conditionally_select_one,
 };
 use poseidon252::{

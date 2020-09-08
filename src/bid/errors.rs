@@ -4,7 +4,6 @@
 
 use dusk_plonk::prelude::*;
 use thiserror::Error;
-
 /// Definition of the erros that Bid operations might have.
 #[derive(Error, Debug)]
 pub enum BidGenerationError<'a> {

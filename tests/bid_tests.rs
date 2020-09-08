@@ -2,7 +2,6 @@
 use anyhow::{Error, Result};
 use blind_bid::bid::Bid;
 use blind_bid::proof::blind_bid_proof;
-use dusk_pki::StealthAddress;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
@@ -39,7 +38,7 @@ fn random_bid(
 }
 
 #[cfg(test)]
-mod tests {
+mod protocol_tests {
     use super::*;
     use kelvin::Blake2b;
     use poseidon252::PoseidonTree;
@@ -467,6 +466,23 @@ mod tests {
         let pi = verifier.mut_cs().public_inputs.clone();
         // The proof should fail since it is non elegible.
         assert!(verifier.verify(&proof, &vk, &pi).is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use super::*;
+    use poseidon252::StorageScalar;
+
+    #[test]
+    fn from_to_bytes_impl_works() -> Result<()> {
+        let bid = random_bid(&JubJubScalar::one(), BlsScalar::one())?;
+        let bid_hash: StorageScalar = bid.into();
+        let bytes = bid.to_bytes();
+        let bid2 = Bid::from_bytes(bytes)?;
+        let bid_hash_2: StorageScalar = bid2.into();
+        assert_eq!(bid_hash.0, bid_hash_2.0);
         Ok(())
     }
 }

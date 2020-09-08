@@ -9,8 +9,8 @@ edition = "2018"
 anyhow = "1.0.0"
 dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.1.1"}
 dusk-plonk = {version = "0.2.8", features = ["trace-print"]}
-poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.2"}
-kelvin = "0.13.0"
+poseidon252 = {git = "https://github.com/dusk-network/Poseidon252", tag = "v0.6.4"}
+kelvin = "0.19.0"
 num-bigint = "0.2.6"
 num-traits = "0.2.11"
 plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.2.0"}
