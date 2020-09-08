@@ -17,6 +17,9 @@ use rand_core::{CryptoRng, RngCore};
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
 
+/// Size of a serialized Bid.
+/// The size is computed by adding up the `PoseidonCipher` size +
+/// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s.
 pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5;
 
 #[derive(Copy, Clone, Debug)]
