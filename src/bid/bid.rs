@@ -124,7 +124,7 @@ impl Bid {
     ///
     /// The function performs the sponge_hash techniqe using poseidon to
     /// get the one-time prover_id and sets it in the Bid.
-    pub(crate) fn generate_prover_id(
+    pub fn generate_prover_id(
         &self,
         secret_k: BlsScalar,
         consensus_round_seed: BlsScalar,
