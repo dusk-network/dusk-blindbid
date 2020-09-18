@@ -51,7 +51,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, _> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -113,6 +113,11 @@ mod protocol_tests {
         verifier.preprocess(&ck)?;
 
         let pi = verifier.mut_cs().public_inputs.clone();
+        for input in pi.iter().enumerate() {
+            if input.1 != &BlsScalar::zero() {
+                println!("{}", input.0);
+            }
+        }
         verifier.verify(&proof, &vk, &pi)
     }
 
@@ -154,7 +159,8 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
-        // Edit the Score so that we try to get a bigger one than the one we should have got.
+        // Edit the Score so that we try to get a bigger one than the one we
+        // should have got.
         score.score = score.score + BlsScalar::from(100u64);
 
         // Proving
@@ -329,8 +335,9 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
-        // Latest consensus step should be lower than the expiration_ts, in this case is not
-        // so the proof should fail since the Bid is expired at this round.
+        // Latest consensus step should be lower than the expiration_ts, in this
+        // case is not so the proof should fail since the Bid is expired
+        // at this round.
         let latest_consensus_round = BlsScalar::from(200u64);
 
         // Proving
@@ -365,8 +372,7 @@ mod protocol_tests {
         )?;
         verifier.preprocess(&ck)?;
 
-        let pi = verifier.mut_cs().public_inputs.clone();
-        // The proof should fail since it is expired.
+        let mut pi = verifier.mut_cs().public_inputs.clone();
         assert!(verifier.verify(&proof, &vk, &pi).is_err());
         Ok(())
     }
@@ -411,8 +417,9 @@ mod protocol_tests {
             .poseidon_branch(0u64)?
             .expect("Poseidon Branch Extraction");
 
-        // We first generate the score as if the bid was still eligible. Otherways
-        // the score generation would fail since the Bid wouldn't be elegible.
+        // We first generate the score as if the bid was still eligible.
+        // Otherways the score generation would fail since the Bid
+        // wouldn't be elegible.
         let latest_consensus_round = BlsScalar::from(3u64);
         let latest_consensus_step = BlsScalar::one();
         let consensus_round_seed = BlsScalar::random(&mut rng);
@@ -427,8 +434,9 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
-        // Latest consensus step should be lower than the elegibility_ts, in this case is not
-        // so the proof should fail since the Bid is non elegible anymore.
+        // Latest consensus step should be lower than the elegibility_ts, in
+        // this case is not so the proof should fail since the Bid is
+        // non elegible anymore.
         let latest_consensus_round = BlsScalar::from(200u64);
 
         // Proving

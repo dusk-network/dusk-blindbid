@@ -1,10 +1,12 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
-// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for
+// details.”
 //!BlsScalar Encoding module for Bid structure.
 //!
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
+use dusk_plonk::jubjub::AffinePoint as JubJubAffine;
 use dusk_plonk::prelude::*;
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
@@ -15,13 +17,14 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // Type 4 will be u32
 // Type 5 will be PoseidonCipher
 // Byte-types are treated in Little Endian.
-// The purpose of this set of flags is to avoid collision between different structures
+// The purpose of this set of flags is to avoid collision between different
+// structures
 const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
 
 /// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct
 /// encoding methods and collapsing it into a `StorageScalar` which can be then
 /// stored inside of a `kelvin` tree data structure.
-impl Into<StorageScalar> for Bid {
+impl Into<StorageScalar> for &Bid {
     fn into(self) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
@@ -43,8 +46,10 @@ impl Into<StorageScalar> for Bid {
         words_deposit.push(self.stealth_address.pk_r().get_y());
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.stealth_address.R().get_x());
-        words_deposit.push(self.stealth_address.R().get_y());
+        words_deposit
+            .push(JubJubAffine::from(self.stealth_address.R()).get_x());
+        words_deposit
+            .push(JubJubAffine::from(self.stealth_address.R()).get_y());
 
         words_deposit.push(self.hashed_secret);
 
@@ -59,6 +64,12 @@ impl Into<StorageScalar> for Bid {
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
         StorageScalar(sponge_hash(&words_deposit))
+    }
+}
+
+impl Into<StorageScalar> for Bid {
+    fn into(self) -> StorageScalar {
+        (&self).into()
     }
 }
 
@@ -92,8 +103,16 @@ impl Bid {
         messages.push(composer.add_input(self.stealth_address.pk_r().get_x()));
         messages.push(composer.add_input(self.stealth_address.pk_r().get_y()));
         // Push both JubJubAffine coordinates as a Scalar.
-        messages.push(composer.add_input(self.stealth_address.R().get_x()));
-        messages.push(composer.add_input(self.stealth_address.R().get_y()));
+        messages.push(
+            composer.add_input(
+                JubJubAffine::from(self.stealth_address.R()).get_x(),
+            ),
+        );
+        messages.push(
+            composer.add_input(
+                JubJubAffine::from(self.stealth_address.R()).get_y(),
+            ),
+        );
         messages.push(composer.add_input(self.hashed_secret));
         // Push both JubJubAffine coordinates as a Scalar.
         messages.push(composer.add_input(self.c.get_x()));
@@ -105,7 +124,7 @@ impl Bid {
         // Perform the sponge_hash inside of the Constraint System
         let storage_bid_hash = sponge_hash_gadget(composer, &messages);
         // Constraint the hash to be equal to the real one
-        let real_hash: StorageScalar = self.clone().into();
+        let real_hash: StorageScalar = self.into();
         let real_hash: BlsScalar = real_hash.into();
         composer.constrain_to_constant(
             storage_bid_hash,
