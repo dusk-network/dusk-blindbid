@@ -106,7 +106,8 @@ pub fn blind_bid_proof(
 
     // 3. t_a >= k_t
     let third_cond =
-        max_bound(composer, latest_consensus_round.scalar, elegibility_ts).0;
+        max_bound(composer, latest_consensus_round.scalar, bid_elegibility_ts)
+            .0;
     // We should get a 0 if t_e is greater, but we need this to be one in order
     // to hold. Therefore we conditionally select one.
     let third_cond = conditionally_select_one(composer, zero, third_cond);
@@ -120,7 +121,7 @@ pub fn blind_bid_proof(
 
     // 4. t_e >= k_t
     let fourth_cond =
-        max_bound(composer, latest_consensus_round.scalar, expiration_ts).0;
+        max_bound(composer, latest_consensus_round.scalar, bid_expiration_ts).0;
     // We should get a 0 if t_e is greater, but we need this to be one in order
     // to hold. Therefore we conditionally select one.
     let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
