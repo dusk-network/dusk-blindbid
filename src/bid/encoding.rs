@@ -24,8 +24,8 @@ const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
 /// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct
 /// encoding methods and collapsing it into a `StorageScalar` which can be then
 /// stored inside of a `kelvin` tree data structure.
-impl Into<StorageScalar> for &Bid {
-    fn into(self) -> StorageScalar {
+impl From<&Bid> for StorageScalar {
+    fn from(bid: &Bid) -> StorageScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
         let mut words_deposit = Vec::new();
@@ -39,27 +39,27 @@ impl Into<StorageScalar> for &Bid {
 
         // 2. Encode each word.
         // Push cipher as scalars.
-        words_deposit.push(self.encrypted_data.cipher()[0]);
-        words_deposit.push(self.encrypted_data.cipher()[1]);
+        words_deposit.push(bid.encrypted_data.cipher()[0]);
+        words_deposit.push(bid.encrypted_data.cipher()[1]);
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.extend_from_slice(
-            self.stealth_address.pk_r().to_hash_inputs().as_ref(),
+            bid.stealth_address.pk_r().to_hash_inputs().as_ref(),
         );
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.extend_from_slice(
-            self.stealth_address.R().to_hash_inputs().as_ref(),
+            bid.stealth_address.R().to_hash_inputs().as_ref(),
         );
 
-        words_deposit.push(self.hashed_secret);
+        words_deposit.push(bid.hashed_secret);
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.c.get_x());
-        words_deposit.push(self.c.get_y());
+        words_deposit.push(bid.c.get_x());
+        words_deposit.push(bid.c.get_y());
         // Push the timestamps of the Bid
-        words_deposit.push(self.elegibility_ts);
-        words_deposit.push(self.expiration_ts);
+        words_deposit.push(bid.elegibility_ts);
+        words_deposit.push(bid.expiration_ts);
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
@@ -68,9 +68,9 @@ impl Into<StorageScalar> for &Bid {
     }
 }
 
-impl Into<StorageScalar> for Bid {
-    fn into(self) -> StorageScalar {
-        (&self).into()
+impl From<Bid> for StorageScalar {
+    fn from(bid: Bid) -> StorageScalar {
+        (&bid).into()
     }
 }
 
@@ -205,10 +205,11 @@ mod tests {
             );
 
             // Constraint the hash to be equal to the real one
-            composer.constrain_to_constant(bid_hash, BlsScalar::zero(), -{
-                let storage_bid: StorageScalar = bid.into();
-                storage_bid.0
-            });
+            composer.constrain_to_constant(
+                bid_hash,
+                BlsScalar::zero(),
+                -StorageScalar::from(bid).0,
+            );
         };
         // Proving
         let mut prover = Prover::new(b"testing");

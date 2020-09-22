@@ -39,8 +39,8 @@ pub fn blind_bid_proof(
     // Get the corresponding `StorageBid` value that for the `Bid`
     // which is effectively the value of the proven leaf (hash of the Bid)
     // and allocate it.
-    let bid_hash: StorageScalar = bid.into();
-    let bid_hash = AllocatedScalar::allocate(composer, bid_hash.0);
+    let bid_hash =
+        AllocatedScalar::allocate(composer, StorageScalar::from(bid).0);
     // Allocate Bid-internal fields
     let bid_hashed_secret =
         AllocatedScalar::allocate(composer, bid.hashed_secret);
