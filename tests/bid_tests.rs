@@ -113,11 +113,6 @@ mod protocol_tests {
         verifier.preprocess(&ck)?;
 
         let pi = verifier.mut_cs().public_inputs.clone();
-        for input in pi.iter().enumerate() {
-            if input.1 != &BlsScalar::zero() {
-                println!("{}", input.0);
-            }
-        }
         verifier.verify(&proof, &vk, &pi)
     }
 
@@ -372,7 +367,7 @@ mod protocol_tests {
         )?;
         verifier.preprocess(&ck)?;
 
-        let mut pi = verifier.mut_cs().public_inputs.clone();
+        let pi = verifier.mut_cs().public_inputs.clone();
         assert!(verifier.verify(&proof, &vk, &pi).is_err());
         Ok(())
     }

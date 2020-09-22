@@ -7,7 +7,6 @@
 
 use super::Bid;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
-use dusk_plonk::jubjub::AffinePoint as JubJubAffine;
 use dusk_plonk::prelude::*;
 use poseidon252::{sponge::sponge::*, StorageScalar};
 
@@ -44,14 +43,14 @@ impl Into<StorageScalar> for &Bid {
         words_deposit.push(self.encrypted_data.cipher()[1]);
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.stealth_address.pk_r().get_x());
-        words_deposit.push(self.stealth_address.pk_r().get_y());
+        words_deposit.extend_from_slice(
+            self.stealth_address.pk_r().to_hash_inputs().as_ref(),
+        );
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit
-            .push(JubJubAffine::from(self.stealth_address.R()).get_x());
-        words_deposit
-            .push(JubJubAffine::from(self.stealth_address.R()).get_y());
+        words_deposit.extend_from_slice(
+            self.stealth_address.R().to_hash_inputs().as_ref(),
+        );
 
         words_deposit.push(self.hashed_secret);
 

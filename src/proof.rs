@@ -64,9 +64,6 @@ pub fn blind_bid_proof(
         AllocatedScalar::allocate(composer, latest_consensus_step);
     let latest_consensus_round =
         AllocatedScalar::allocate(composer, latest_consensus_round);
-    let elegibility_ts =
-        AllocatedScalar::allocate(composer, bid.elegibility_ts);
-    let expiration_ts = AllocatedScalar::allocate(composer, bid.expiration_ts);
     // Decrypt the cypher using the secret and allocate value & blinder
     let decrypted_data = bid.encrypted_data.decrypt(secret, &bid.nonce)?;
     let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
