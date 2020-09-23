@@ -79,6 +79,9 @@ impl From<Bid> for StorageScalar {
 /// Variable which contains the hash of the Bid.
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
+    // TODO: We should switch to a different representation for this.
+    // it can be a custom PoseidonCipherVariable structure or maybe
+    // just a fixed len array of Variables.
     encrypted_data: (Variable, Variable),
     commitment: PlonkPoint,
     // (Pkr, R)
