@@ -6,13 +6,14 @@ use super::BidGenerationError;
 use anyhow::{Error, Result};
 use dusk_pki::{Ownable, StealthAddress};
 use dusk_plonk::jubjub::{
-    AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
+    AffinePoint, ExtendedPoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_plonk::prelude::*;
 use kelvin::{ByteHash, Content, Sink, Source};
 use poseidon252::cipher::PoseidonCipher;
 use poseidon252::cipher::ENCRYPTED_DATA_SIZE;
 use poseidon252::sponge::sponge::sponge_hash;
+use poseidon252::StorageScalar;
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
@@ -222,6 +223,29 @@ impl Bid {
             expiration_ts,
         })
     }
+
+    pub fn hash(&self) -> BlsScalar {
+        sponge_hash(
+            self.encrypted_data
+                .cipher()
+                .iter()
+                .chain(
+                    [
+                        self.nonce,
+                        self.hashed_secret,
+                        self.elegibility_ts,
+                        self.expiration_ts,
+                    ]
+                    .iter(),
+                )
+                .chain(self.stealth_address.R().to_hash_inputs().iter())
+                .chain(self.stealth_address.pk_r().to_hash_inputs().iter())
+                .chain(ExtendedPoint::from(self.c).to_hash_inputs().iter())
+                .map(|s| *s)
+                .collect::<Vec<BlsScalar>>()
+                .as_slice(),
+        )
+    }
 }
 
 impl Read for Bid {
@@ -359,5 +383,11 @@ impl<H: ByteHash> Content<H> for Bid {
             elegibility_ts,
             expiration_ts,
         })
+    }
+}
+
+impl<'a> From<&'a Bid> for StorageScalar {
+    fn from(bid: &'a Bid) -> StorageScalar {
+        StorageScalar(bid.hash())
     }
 }

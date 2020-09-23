@@ -51,7 +51,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -124,7 +124,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -202,7 +202,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -281,7 +281,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
 
         // Create an expired bid.
         let mut rng = rand::thread_rng();
@@ -379,7 +379,7 @@ mod protocol_tests {
         let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<_, Blake2b> = PoseidonTree::new(17usize);
+        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
 
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();
