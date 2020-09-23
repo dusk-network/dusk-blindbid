@@ -1,11 +1,14 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
-// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for
+// details.”
 //! BlindBidProof module.
 
-use crate::bid::Bid;
+use crate::bid::{encoding::preimage_gadget, Bid};
 use crate::score_gen::*;
 use anyhow::Result;
-use dusk_plonk::constraint_system::ecc::scalar_mul::fixed_base::scalar_mul;
+use dusk_plonk::constraint_system::ecc::{
+    scalar_mul::fixed_base::scalar_mul, Point,
+};
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
@@ -34,18 +37,38 @@ pub fn blind_bid_proof(
     // Generate constant witness values for 0.
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
     // Get the corresponding `StorageBid` value that for the `Bid`
-    // which is effectively the value of the proven leaf.
-    let encoded_bid: StorageScalar = bid.into();
-    let proven_leaf = composer.add_input(encoded_bid.into());
+    // which is effectively the value of the proven leaf (hash of the Bid)
+    // and allocate it.
+    let bid_hash =
+        AllocatedScalar::allocate(composer, StorageScalar::from(bid).0);
+    // Allocate Bid-internal fields
+    let bid_hashed_secret =
+        AllocatedScalar::allocate(composer, bid.hashed_secret);
+    let bid_cipher = (
+        composer.add_input(bid.encrypted_data.cipher()[0]),
+        composer.add_input(bid.encrypted_data.cipher()[1]),
+    );
+    let bid_commitment = Point::from_private_affine(composer, bid.c);
+    let bid_stealth_addr = (
+        Point::from_private_affine(composer, bid.stealth_address.pk_r().into()),
+        Point::from_private_affine(composer, bid.stealth_address.R().into()),
+    );
+    let bid_elegibility_ts =
+        AllocatedScalar::allocate(composer, bid.elegibility_ts);
+    let bid_expiration_ts =
+        AllocatedScalar::allocate(composer, bid.expiration_ts);
     // Allocate bid-needed inputs
+    let secret_k = AllocatedScalar::allocate(composer, secret_k);
     let seed = AllocatedScalar::allocate(composer, seed);
     let latest_consensus_step =
         AllocatedScalar::allocate(composer, latest_consensus_step);
     let latest_consensus_round =
         AllocatedScalar::allocate(composer, latest_consensus_round);
-    let elegibility_ts =
-        AllocatedScalar::allocate(composer, bid.elegibility_ts);
-    let expiration_ts = AllocatedScalar::allocate(composer, bid.expiration_ts);
+    // Decrypt the cypher using the secret and allocate value & blinder
+    let decrypted_data = bid.encrypted_data.decrypt(secret, &bid.nonce)?;
+    let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
+    let bid_blinder = AllocatedScalar::allocate(composer, decrypted_data[1]);
+
     // Allocate the bid tree root to be used later by the score_generation
     // gadget.
     let bid_tree_root = AllocatedScalar::allocate(composer, branch.root);
@@ -57,19 +80,33 @@ pub fn blind_bid_proof(
         -branch.root,
     );
 
-    // XXX: This should come from a decryption. See with Togh.
-    let secret_k = AllocatedScalar::allocate(composer, secret_k);
-
     // 1. Merkle Opening
-    merkle_opening_gadget(composer, branch.clone(), proven_leaf, branch.root);
+    merkle_opening_gadget(composer, branch.clone(), bid_hash.var, branch.root);
+
     // 2. Bid pre_image check
-    bid.preimage_gadget(composer);
+    let computed_bid_hash = preimage_gadget(
+        composer,
+        bid_cipher,
+        bid_commitment,
+        bid_stealth_addr,
+        bid_hashed_secret.var,
+        bid_elegibility_ts.var,
+        bid_expiration_ts.var,
+    );
+
+    // Constraint the hash to be equal to the real one
+    composer.constrain_to_constant(
+        computed_bid_hash,
+        BlsScalar::zero(),
+        -bid_hash.scalar,
+    );
 
     // 3. t_a >= k_t
     let third_cond =
-        max_bound(composer, latest_consensus_round.scalar, elegibility_ts).0;
-    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
-    // Therefore we conditionally select one.
+        max_bound(composer, latest_consensus_round.scalar, bid_elegibility_ts)
+            .0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order
+    // to hold. Therefore we conditionally select one.
     let third_cond = conditionally_select_one(composer, zero, third_cond);
     // Constraint third condition to be true.
     // So basically, that the rangeproofs hold.
@@ -81,9 +118,9 @@ pub fn blind_bid_proof(
 
     // 4. t_e >= k_t
     let fourth_cond =
-        max_bound(composer, latest_consensus_round.scalar, expiration_ts).0;
-    // We should get a 0 if t_e is greater, but we need this to be one in order to hold.
-    // Therefore we conditionally select one.
+        max_bound(composer, latest_consensus_round.scalar, bid_expiration_ts).0;
+    // We should get a 0 if t_e is greater, but we need this to be one in order
+    // to hold. Therefore we conditionally select one.
     let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
     // Constraint fourth condition to be true.
     // So basically, that the rangeproofs hold.
@@ -93,25 +130,16 @@ pub fn blind_bid_proof(
         BlsScalar::zero(),
     );
 
-    let decrypted_data = bid.encrypted_data.decrypt(secret, &bid.nonce)?;
-    let value = decrypted_data[0];
-    let blinder = decrypted_data[1];
-
     // 5. c = C(v, b) Pedersen Commitment check
-    let bid_value = AllocatedScalar::allocate(composer, value.into());
-    let blinder = composer.add_input(blinder.into());
     let p1 = scalar_mul(composer, bid_value.var, GENERATOR_EXTENDED);
-    let p2 = scalar_mul(composer, blinder, GENERATOR_NUMS_EXTENDED);
+    let p2 = scalar_mul(composer, bid_blinder.var, GENERATOR_NUMS_EXTENDED);
     let computed_c = p1.point().fast_add(composer, *p2.point());
     // Assert computed_commitment == announced commitment.
     composer.assert_equal_public_point(computed_c, bid.c);
 
     // 6. 0 < value <= 2^64 range check
-    // Here is safe to unwrap since the order of the JubJub Scalar field is
-    // shorter than the BLS12_381 one.
-    let value = composer.add_input(value.into());
     // v < 2^64
-    composer.range_gate(value, 64usize);
+    composer.range_gate(bid_value.var, 64usize);
 
     // 7. `m = H(k)` Secret key pre-image check.
     let secret_k_hash = sponge_hash_gadget(composer, &[secret_k.var]);
