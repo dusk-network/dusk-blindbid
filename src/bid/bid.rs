@@ -10,9 +10,9 @@ use dusk_plonk::jubjub::{
 };
 use dusk_plonk::prelude::*;
 use kelvin::{ByteHash, Content, Sink, Source};
-use poseidon252::cipher::PoseidonCipher;
-use poseidon252::cipher::ENCRYPTED_DATA_SIZE;
+use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
 use poseidon252::sponge::sponge::sponge_hash;
+use poseidon252::StorageScalar;
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
@@ -222,7 +222,23 @@ impl Bid {
             expiration_ts,
         })
     }
+
+    /// Check if the bid is eligible for the provided block height
+    pub fn eligible(&self, block_height: &BlsScalar) -> bool {
+        &self.elegibility_ts <= block_height
+            && block_height <= &self.expiration_ts
+    }
 }
+
+impl PartialEq for Bid {
+    fn eq(&self, other: &Self) -> bool {
+        StorageScalar::from(self)
+            .0
+            .eq(&StorageScalar::from(other).0)
+    }
+}
+
+impl Eq for Bid {}
 
 impl Read for Bid {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
