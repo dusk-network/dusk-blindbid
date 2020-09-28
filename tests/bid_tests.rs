@@ -1,10 +1,11 @@
 #![allow(non_snake_case)]
 use anyhow::{Error, Result};
 use blind_bid::bid::Bid;
-use blind_bid::proof::blind_bid_proof;
+use blind_bid::proof::BlindBidCircuit;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
+use poseidon252::StorageScalar;
 use rand::Rng;
 
 const V_RAW_MIN: u64 = 50_000u64;
@@ -48,7 +49,6 @@ mod protocol_tests {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
@@ -59,9 +59,9 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = BlsScalar::from(50u64);
         let latest_consensus_round = BlsScalar::from(50u64);
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let latest_consensus_step = BlsScalar::from(50u64);
 
         // Append the StorageBid as an StorageScalar to the tree.
         tree.push(bid)?;
@@ -81,39 +81,36 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        blind_bid_proof(
-            prover.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
+        let prover_id = bid.generate_prover_id(
             secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
             consensus_round_seed,
-        )?;
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(
-            verifier.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
             latest_consensus_round,
-            consensus_round_seed,
-        )?;
-        verifier.preprocess(&ck)?;
+            latest_consensus_step,
+        );
 
-        let pi = verifier.mut_cs().public_inputs.clone();
-        verifier.verify(&proof, &vk, &pi)
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(score),
+            secret_k: Some(secret_k),
+            secret: Some(secret),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
+
+        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
+        let pi = vec![
+            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-StorageScalar::from(bid).0, 0),
+            PublicInput::AffinePoint(bid.c, 0, 0),
+            PublicInput::BlsScalar(-bid.hashed_secret, 0),
+            PublicInput::BlsScalar(-prover_id, 0),
+        ];
+        circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
     }
 
     #[test]
@@ -121,7 +118,6 @@ mod protocol_tests {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
@@ -157,41 +153,39 @@ mod protocol_tests {
         // Edit the Score so that we try to get a bigger one than the one we
         // should have got.
         score.score = score.score + BlsScalar::from(100u64);
-
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        blind_bid_proof(
-            prover.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
+        let prover_id = bid.generate_prover_id(
             secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
             consensus_round_seed,
-        )?;
-
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(
-            verifier.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
             latest_consensus_round,
-            consensus_round_seed,
-        )?;
-        verifier.preprocess(&ck)?;
+            latest_consensus_step,
+        );
 
-        let pi = verifier.mut_cs().public_inputs.clone();
-        assert!(verifier.verify(&proof, &vk, &pi).is_err());
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(score),
+            secret_k: Some(secret_k),
+            secret: Some(secret),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
+
+        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let proof =
+            circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
+        let pi = vec![
+            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-StorageScalar::from(bid).0, 0),
+            PublicInput::AffinePoint(bid.c, 0, 0),
+            PublicInput::BlsScalar(-bid.hashed_secret, 0),
+            PublicInput::BlsScalar(-prover_id, 0),
+        ];
+        assert!(circuit
+            .verify_proof(&pub_params, &vk, b"BidWithEditedScore", &proof, &pi)
+            .is_err());
         Ok(())
     }
 
@@ -200,7 +194,6 @@ mod protocol_tests {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
@@ -234,43 +227,41 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
+        let prover_id = bid.generate_prover_id(
+            secret_k,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+
         // Edit the Bid in order to cheat and get a bigger Score/whatever.
         bid.hashed_secret = BlsScalar::from(63463245u64);
 
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        blind_bid_proof(
-            prover.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
-            consensus_round_seed,
-        )?;
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(score),
+            secret_k: Some(secret_k),
+            secret: Some(secret),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
 
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(
-            verifier.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
-            consensus_round_seed,
-        )?;
-        verifier.preprocess(&ck)?;
-
-        let pi = verifier.mut_cs().public_inputs.clone();
-        assert!(verifier.verify(&proof, &vk, &pi).is_err());
+        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
+        let pi = vec![
+            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-StorageScalar::from(bid).0, 0),
+            PublicInput::AffinePoint(bid.c, 0, 0),
+            PublicInput::BlsScalar(-bid.hashed_secret, 0),
+            PublicInput::BlsScalar(-prover_id, 0),
+        ];
+        assert!(circuit
+            .verify_proof(&pub_params, &vk, b"EditedBidValue", &proof, &pi)
+            .is_err());
         Ok(())
     }
 
@@ -279,7 +270,6 @@ mod protocol_tests {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
@@ -335,40 +325,38 @@ mod protocol_tests {
         // at this round.
         let latest_consensus_round = BlsScalar::from(200u64);
 
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        blind_bid_proof(
-            prover.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
+        let prover_id = bid.generate_prover_id(
             secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
             consensus_round_seed,
-        )?;
-
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(
-            verifier.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
             latest_consensus_round,
-            consensus_round_seed,
-        )?;
-        verifier.preprocess(&ck)?;
+            latest_consensus_step,
+        );
 
-        let pi = verifier.mut_cs().public_inputs.clone();
-        assert!(verifier.verify(&proof, &vk, &pi).is_err());
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(score),
+            secret_k: Some(secret_k),
+            secret: Some(secret),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
+
+        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
+        let pi = vec![
+            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-StorageScalar::from(bid).0, 0),
+            PublicInput::AffinePoint(bid.c, 0, 0),
+            PublicInput::BlsScalar(-bid.hashed_secret, 0),
+            PublicInput::BlsScalar(-prover_id, 0),
+        ];
+        assert!(circuit
+            .verify_proof(&pub_params, &vk, b"ExpiredBid", &proof, &pi)
+            .is_err());
         Ok(())
     }
 
@@ -377,7 +365,6 @@ mod protocol_tests {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 16)?;
 
         // Generate a PoseidonTree and append the Bid.
         let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
@@ -429,46 +416,43 @@ mod protocol_tests {
             latest_consensus_step,
         )?;
 
+        let prover_id = bid.generate_prover_id(
+            secret_k,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        );
+
         // Latest consensus step should be lower than the elegibility_ts, in
         // this case is not so the proof should fail since the Bid is
         // non elegible anymore.
         let latest_consensus_round = BlsScalar::from(200u64);
 
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        blind_bid_proof(
-            prover.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
-            consensus_round_seed,
-        )?;
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(score),
+            secret_k: Some(secret_k),
+            secret: Some(secret),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
 
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        blind_bid_proof(
-            verifier.mut_cs(),
-            bid,
-            score,
-            &branch,
-            &secret,
-            secret_k,
-            latest_consensus_step,
-            latest_consensus_round,
-            consensus_round_seed,
-        )?;
-        verifier.preprocess(&ck)?;
-
-        let pi = verifier.mut_cs().public_inputs.clone();
-        // The proof should fail since it is non elegible.
-        assert!(verifier.verify(&proof, &vk, &pi).is_err());
+        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
+        let pi = vec![
+            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-StorageScalar::from(bid).0, 0),
+            PublicInput::AffinePoint(bid.c, 0, 0),
+            PublicInput::BlsScalar(-bid.hashed_secret, 0),
+            PublicInput::BlsScalar(-prover_id, 0),
+        ];
+        assert!(circuit
+            .verify_proof(&pub_params, &vk, b"NonElegibleBid", &proof, &pi)
+            .is_err());
         Ok(())
     }
 }
