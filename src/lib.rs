@@ -1,5 +1,6 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
-// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
+// Licensed under the MPL 2.0 license. See LICENSE file in the project root for
+// details.”
 //! BlindBid impl
 #![allow(non_snake_case)]
 pub mod bid;
@@ -17,3 +18,6 @@ pub const V_MIN: &'static JubJubScalar =
 /// The maximum amount user is permitted to bid
 pub const V_MAX: &'static JubJubScalar =
     &JubJubScalar::from_raw([V_RAW_MAX, 0, 0, 0]);
+
+/// BlindBidCircuit instance
+pub use proof::BlindBidCircuit;
