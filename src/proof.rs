@@ -44,7 +44,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         &mut self,
         composer: &mut StandardComposer,
     ) -> Result<Vec<PublicInput>, Error> {
-        // Instanciate PI vector.
+        // Instantiate PI vector.
         let mut pi = Vec::new();
         // Generate constant witness values for 0.
         let zero =
@@ -93,7 +93,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
                 bid.stealth_address.R().into(),
             ),
         );
-        let bid_elegibility_ts =
+        let bid_eligibility_ts =
             AllocatedScalar::allocate(composer, bid.elegibility_ts);
         let bid_expiration_ts =
             AllocatedScalar::allocate(composer, bid.expiration_ts);
@@ -147,7 +147,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             bid_commitment,
             bid_stealth_addr,
             bid_hashed_secret.var,
-            bid_elegibility_ts.var,
+            bid_eligibility_ts.var,
             bid_expiration_ts.var,
         );
 
@@ -167,7 +167,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let third_cond = max_bound(
             composer,
             latest_consensus_round.scalar,
-            bid_elegibility_ts,
+            bid_eligibility_ts,
         )
         .0;
         // We should get a 0 if t_e is greater, but we need this to be one in
@@ -291,7 +291,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let (ck, _) = pub_params.trim(1 << 16)?;
         // Generate & save `ProverKey` with some random values.
         let mut prover = Prover::new(b"TestCircuit");
-        // Set size & Pi builder
+        // Set size & PI builder
         self.pi_constructor = Some(self.gadget(prover.mut_cs())?);
         prover.preprocess(&ck)?;
 
