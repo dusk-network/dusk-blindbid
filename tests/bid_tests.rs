@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use anyhow::{Error, Result};
-use blind_bid::bid::Bid;
-use blind_bid::proof::BlindBidCircuit;
+use dusk_blindbid::bid::Bid;
+use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
