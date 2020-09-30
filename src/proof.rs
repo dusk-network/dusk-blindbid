@@ -73,8 +73,8 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
-        let bid_hash =
-            AllocatedScalar::allocate(composer, StorageScalar::from(bid).0);
+        let storage_bid: StorageScalar = bid.into();
+        let bid_hash = AllocatedScalar::allocate(composer, storage_bid.0);
         // Allocate Bid-internal fields
         let bid_hashed_secret =
             AllocatedScalar::allocate(composer, bid.hashed_secret);

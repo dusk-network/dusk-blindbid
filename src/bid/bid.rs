@@ -232,9 +232,10 @@ impl Bid {
 
 impl PartialEq for Bid {
     fn eq(&self, other: &Self) -> bool {
-        StorageScalar::from(self)
-            .0
-            .eq(&StorageScalar::from(other).0)
+        let lhs: StorageScalar = self.into();
+        let rhs: StorageScalar = other.into();
+
+        lhs.0.eq(&rhs.0)
     }
 }
 
