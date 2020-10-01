@@ -41,8 +41,7 @@ fn random_bid(
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
-    use kelvin::Blake2b;
-    use poseidon252::PoseidonTree;
+    use dusk_blindbid::tree::BidTree;
 
     #[test]
     fn correct_blindbid_proof() -> Result<()> {
@@ -50,8 +49,8 @@ mod protocol_tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-        // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
+        // Generate a BidTree and append the Bid.
+        let mut tree = BidTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -120,8 +119,8 @@ mod protocol_tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-        // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
+        // Generate a BidTree and append the Bid.
+        let mut tree = BidTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -197,8 +196,8 @@ mod protocol_tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-        // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
+        // Generate a BidTree and append the Bid.
+        let mut tree = BidTree::new(17usize);
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
@@ -274,8 +273,8 @@ mod protocol_tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-        // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
+        // Generate a BidTree and append the Bid.
+        let mut tree = BidTree::new(17usize);
 
         // Create an expired bid.
         let mut rng = rand::thread_rng();
@@ -370,8 +369,8 @@ mod protocol_tests {
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-        // Generate a PoseidonTree and append the Bid.
-        let mut tree: PoseidonTree<Bid, Blake2b> = PoseidonTree::new(17usize);
+        // Generate a BidTree and append the Bid.
+        let mut tree = BidTree::new(17usize);
 
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();

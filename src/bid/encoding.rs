@@ -56,8 +56,8 @@ impl Bid {
         words_deposit.push(self.c.get_x());
         words_deposit.push(self.c.get_y());
         // Push the timestamps of the Bid
-        words_deposit.push(self.elegibility_ts);
-        words_deposit.push(self.expiration_ts);
+        words_deposit.push(self.eligibility);
+        words_deposit.push(self.expiration);
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
@@ -91,8 +91,8 @@ pub(crate) fn preimage_gadget(
     // (Pkr, R)
     stealth_addr: (PlonkPoint, PlonkPoint),
     hashed_secret: Variable,
-    elegibility_ts: Variable,
-    expiration_ts: Variable,
+    eligibility: Variable,
+    expiration: Variable,
 ) -> Variable {
     // This field represents the types of the inputs and has to be the same
     // as the default one.
@@ -118,8 +118,8 @@ pub(crate) fn preimage_gadget(
     messages.push(*commitment.x());
     messages.push(*commitment.y());
     // Add elebility & expiration timestamps.
-    messages.push(elegibility_ts);
-    messages.push(expiration_ts);
+    messages.push(eligibility);
+    messages.push(expiration);
 
     // Perform the sponge_hash inside of the Constraint System
     sponge_hash_gadget(composer, &messages)
@@ -146,8 +146,8 @@ mod tests {
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
-        let elegibility_ts = -BlsScalar::one();
-        let expiration_ts = -BlsScalar::one();
+        let eligibility = -BlsScalar::one();
+        let expiration = -BlsScalar::one();
 
         Bid::new(
             &mut rng,
@@ -155,8 +155,8 @@ mod tests {
             &value,
             &secret.into(),
             secret_k,
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
         )
     }
 
@@ -197,18 +197,18 @@ mod tests {
                     bid.stealth_address.R().into(),
                 ),
             );
-            let elegibility_ts =
-                AllocatedScalar::allocate(composer, bid.elegibility_ts);
-            let expiration_ts =
-                AllocatedScalar::allocate(composer, bid.expiration_ts);
+            let eligibility =
+                AllocatedScalar::allocate(composer, bid.eligibility);
+            let expiration =
+                AllocatedScalar::allocate(composer, bid.expiration);
             let bid_hash = preimage_gadget(
                 composer,
                 bid_cipher,
                 bid_commitment,
                 bid_stealth_addr,
                 bid_hashed_secret.var,
-                elegibility_ts.var,
-                expiration_ts.var,
+                eligibility.var,
+                expiration.var,
             );
 
             // Constraint the hash to be equal to the real one

@@ -6,11 +6,12 @@
 pub mod bid;
 pub mod proof;
 pub mod score_gen;
+pub mod tree;
 
 use dusk_plonk::prelude::*;
 
-pub(crate) const V_RAW_MIN: u64 = 50_000u64;
-pub(crate) const V_RAW_MAX: u64 = 250_000u64;
+pub const V_RAW_MIN: u64 = 50_000u64;
+pub const V_RAW_MAX: u64 = 250_000u64;
 
 /// The minimum amount user is permitted to bid
 pub const V_MIN: &'static JubJubScalar =

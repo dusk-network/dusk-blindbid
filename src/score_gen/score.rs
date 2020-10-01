@@ -53,7 +53,7 @@ impl Bid {
         latest_consensus_round: BlsScalar,
         latest_consensus_step: BlsScalar,
     ) -> Result<Score, Error> {
-        if latest_consensus_round.reduce() > self.expiration_ts.reduce() {
+        if latest_consensus_round.reduce() > self.expiration.reduce() {
             return Err(ScoreError::ExpiredBid.into());
         };
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
@@ -284,8 +284,8 @@ mod tests {
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
-        let elegibility_ts = -BlsScalar::one();
-        let expiration_ts = -BlsScalar::one();
+        let eligibility = -BlsScalar::one();
+        let expiration = -BlsScalar::one();
 
         Bid::new(
             &mut rng,
@@ -293,8 +293,8 @@ mod tests {
             &value,
             &secret.into(),
             secret_k,
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
         )
     }
 

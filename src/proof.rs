@@ -94,9 +94,9 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             ),
         );
         let bid_eligibility_ts =
-            AllocatedScalar::allocate(composer, bid.elegibility_ts);
-        let bid_expiration_ts =
-            AllocatedScalar::allocate(composer, bid.expiration_ts);
+            AllocatedScalar::allocate(composer, bid.eligibility);
+        let bid_expiration =
+            AllocatedScalar::allocate(composer, bid.expiration);
         // Allocate bid-needed inputs
         let secret_k = AllocatedScalar::allocate(composer, secret_k);
         let seed = AllocatedScalar::allocate(composer, seed);
@@ -148,7 +148,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             bid_stealth_addr,
             bid_hashed_secret.var,
             bid_eligibility_ts.var,
-            bid_expiration_ts.var,
+            bid_expiration.var,
         );
 
         // Add PI constraint for bid preimage check.
@@ -182,12 +182,9 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 4. t_e >= k_t
-        let fourth_cond = max_bound(
-            composer,
-            latest_consensus_round.scalar,
-            bid_expiration_ts,
-        )
-        .0;
+        let fourth_cond =
+            max_bound(composer, latest_consensus_round.scalar, bid_expiration)
+                .0;
         // We should get a 0 if t_e is greater, but we need this to be one in
         // order to hold. Therefore we conditionally select one.
         let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
