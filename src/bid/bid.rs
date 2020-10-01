@@ -16,7 +16,6 @@ use dusk_plonk::prelude::*;
 use kelvin::{ByteHash, Content, Sink, Source};
 use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
 use poseidon252::sponge::sponge::sponge_hash;
-use poseidon252::StorageScalar;
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
@@ -39,9 +38,9 @@ pub struct Bid {
     // c (Pedersen Commitment)
     pub c: AffinePoint,
     // Elegibility timestamp
-    pub elegibility_ts: BlsScalar,
+    pub eligibility: BlsScalar,
     // Expiration timestamp
-    pub expiration_ts: BlsScalar,
+    pub expiration: BlsScalar,
 }
 
 impl Ownable for Bid {
@@ -57,8 +56,8 @@ impl Bid {
         value: &JubJubScalar,
         secret: &AffinePoint,
         secret_k: BlsScalar,
-        elegibility_ts: BlsScalar,
-        expiration_ts: BlsScalar,
+        eligibility: BlsScalar,
+        expiration: BlsScalar,
     ) -> Result<Self, Error>
     where
         R: RngCore + CryptoRng,
@@ -89,8 +88,8 @@ impl Bid {
         let mut bid = Bid {
             // Compute and add the `hashed_secret` to the Bid.
             hashed_secret: sponge_hash(&[secret_k]),
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
             c: AffinePoint::default(),
             stealth_address: *stealth_address,
             encrypted_data: PoseidonCipher::default(),
@@ -178,8 +177,8 @@ impl Bid {
         buf[128..192].copy_from_slice(&self.stealth_address.to_bytes());
         buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
         buf[224..256].copy_from_slice(&self.c.to_bytes());
-        buf[256..288].copy_from_slice(&self.elegibility_ts.to_bytes());
-        buf[288..320].copy_from_slice(&self.expiration_ts.to_bytes());
+        buf[256..288].copy_from_slice(&self.eligibility.to_bytes());
+        buf[288..320].copy_from_slice(&self.expiration.to_bytes());
         buf
     }
 
@@ -211,10 +210,10 @@ impl Bid {
         let c = read_jubjub_affine(&one_scalar)?;
 
         one_scalar[..].copy_from_slice(&bytes[256..288]);
-        let elegibility_ts = read_scalar(&one_scalar)?;
+        let eligibility = read_scalar(&one_scalar)?;
 
         one_scalar[..].copy_from_slice(&bytes[288..320]);
-        let expiration_ts = read_scalar(&one_scalar)?;
+        let expiration = read_scalar(&one_scalar)?;
 
         Ok(Bid {
             encrypted_data,
@@ -222,23 +221,20 @@ impl Bid {
             stealth_address,
             hashed_secret,
             c,
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
         })
     }
 
     /// Check if the bid is eligible for the provided block height
     pub fn eligible(&self, block_height: &BlsScalar) -> bool {
-        &self.elegibility_ts <= block_height
-            && block_height <= &self.expiration_ts
+        &self.eligibility <= block_height && block_height <= &self.expiration
     }
 }
 
 impl PartialEq for Bid {
     fn eq(&self, other: &Self) -> bool {
-        StorageScalar::from(self)
-            .0
-            .eq(&StorageScalar::from(other).0)
+        self.hash().eq(&other.hash())
     }
 }
 
@@ -254,8 +250,8 @@ impl Read for Bid {
         n += buf.write(&self.stealth_address.to_bytes())?;
         n += buf.write(&self.hashed_secret.to_bytes())?;
         n += buf.write(&self.c.to_bytes())?;
-        n += buf.write(&self.elegibility_ts.to_bytes())?;
-        n += buf.write(&self.expiration_ts.to_bytes())?;
+        n += buf.write(&self.eligibility.to_bytes())?;
+        n += buf.write(&self.expiration.to_bytes())?;
 
         buf.flush()?;
         Ok(n)
@@ -315,11 +311,11 @@ impl Write for Bid {
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.elegibility_ts = read_scalar(&one_scalar)?;
+        self.eligibility = read_scalar(&one_scalar)?;
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.expiration_ts = read_scalar(&one_scalar)?;
+        self.expiration = read_scalar(&one_scalar)?;
         Ok(n)
     }
 
@@ -335,8 +331,8 @@ impl<H: ByteHash> Content<H> for Bid {
         sink.write_all(&self.stealth_address.to_bytes())?;
         sink.write_all(&self.hashed_secret.to_bytes())?;
         sink.write_all(&self.c.to_bytes())?;
-        sink.write_all(&self.elegibility_ts.to_bytes())?;
-        sink.write_all(&self.expiration_ts.to_bytes())?;
+        sink.write_all(&self.eligibility.to_bytes())?;
+        sink.write_all(&self.expiration.to_bytes())?;
         Ok(())
     }
 
@@ -365,10 +361,10 @@ impl<H: ByteHash> Content<H> for Bid {
         let commitment = read_jubjub_affine(&one_scalar)?;
 
         source.read_exact(&mut one_scalar)?;
-        let elegibility_ts = read_scalar(&one_scalar)?;
+        let eligibility = read_scalar(&one_scalar)?;
 
         source.read_exact(&mut one_scalar)?;
-        let expiration_ts = read_scalar(&one_scalar)?;
+        let expiration = read_scalar(&one_scalar)?;
 
         Ok(Bid {
             encrypted_data,
@@ -376,8 +372,8 @@ impl<H: ByteHash> Content<H> for Bid {
             stealth_address,
             hashed_secret,
             c: commitment,
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
         })
     }
 }

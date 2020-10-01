@@ -24,11 +24,9 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // structures
 const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
 
-/// Encodes a `StorageBid` in a `StorageScalar` form by applying the correct
-/// encoding methods and collapsing it into a `StorageScalar` which can be then
-/// stored inside of a `kelvin` tree data structure.
-impl From<&Bid> for StorageScalar {
-    fn from(bid: &Bid) -> StorageScalar {
+impl Bid {
+    /// Calculate the one-way BlsScalar representation of the Bid
+    pub fn hash(&self) -> BlsScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
         let mut words_deposit = Vec::new();
@@ -42,38 +40,44 @@ impl From<&Bid> for StorageScalar {
 
         // 2. Encode each word.
         // Push cipher as scalars.
-        words_deposit.push(bid.encrypted_data.cipher()[0]);
-        words_deposit.push(bid.encrypted_data.cipher()[1]);
+        words_deposit.push(self.encrypted_data.cipher()[0]);
+        words_deposit.push(self.encrypted_data.cipher()[1]);
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.extend_from_slice(
-            bid.stealth_address.pk_r().to_hash_inputs().as_ref(),
+            self.stealth_address.pk_r().to_hash_inputs().as_ref(),
         );
 
         // Push both JubJubAffine coordinates as a Scalar.
         words_deposit.extend_from_slice(
-            bid.stealth_address.R().to_hash_inputs().as_ref(),
+            self.stealth_address.R().to_hash_inputs().as_ref(),
         );
 
-        words_deposit.push(bid.hashed_secret);
+        words_deposit.push(self.hashed_secret);
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(bid.c.get_x());
-        words_deposit.push(bid.c.get_y());
+        words_deposit.push(self.c.get_x());
+        words_deposit.push(self.c.get_y());
         // Push the timestamps of the Bid
-        words_deposit.push(bid.elegibility_ts);
-        words_deposit.push(bid.expiration_ts);
+        words_deposit.push(self.eligibility);
+        words_deposit.push(self.expiration);
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
-        StorageScalar(sponge_hash(&words_deposit))
+        sponge_hash(&words_deposit)
     }
 }
 
-impl From<Bid> for StorageScalar {
-    fn from(bid: Bid) -> StorageScalar {
-        (&bid).into()
+impl Into<StorageScalar> for &Bid {
+    fn into(self) -> StorageScalar {
+        StorageScalar(self.hash())
+    }
+}
+
+impl Into<StorageScalar> for Bid {
+    fn into(self) -> StorageScalar {
+        (&self).into()
     }
 }
 
@@ -90,8 +94,8 @@ pub(crate) fn preimage_gadget(
     // (Pkr, R)
     stealth_addr: (PlonkPoint, PlonkPoint),
     hashed_secret: Variable,
-    elegibility_ts: Variable,
-    expiration_ts: Variable,
+    eligibility: Variable,
+    expiration: Variable,
 ) -> Variable {
     // This field represents the types of the inputs and has to be the same
     // as the default one.
@@ -117,8 +121,8 @@ pub(crate) fn preimage_gadget(
     messages.push(*commitment.x());
     messages.push(*commitment.y());
     // Add elebility & expiration timestamps.
-    messages.push(elegibility_ts);
-    messages.push(expiration_ts);
+    messages.push(eligibility);
+    messages.push(expiration);
 
     // Perform the sponge_hash inside of the Constraint System
     sponge_hash_gadget(composer, &messages)
@@ -145,8 +149,8 @@ mod tests {
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
-        let elegibility_ts = -BlsScalar::one();
-        let expiration_ts = -BlsScalar::one();
+        let eligibility = -BlsScalar::one();
+        let expiration = -BlsScalar::one();
 
         Bid::new(
             &mut rng,
@@ -154,8 +158,8 @@ mod tests {
             &value,
             &secret.into(),
             secret_k,
-            elegibility_ts,
-            expiration_ts,
+            eligibility,
+            expiration,
         )
     }
 
@@ -196,25 +200,26 @@ mod tests {
                     bid.stealth_address.R().into(),
                 ),
             );
-            let elegibility_ts =
-                AllocatedScalar::allocate(composer, bid.elegibility_ts);
-            let expiration_ts =
-                AllocatedScalar::allocate(composer, bid.expiration_ts);
+            let eligibility =
+                AllocatedScalar::allocate(composer, bid.eligibility);
+            let expiration =
+                AllocatedScalar::allocate(composer, bid.expiration);
             let bid_hash = preimage_gadget(
                 composer,
                 bid_cipher,
                 bid_commitment,
                 bid_stealth_addr,
                 bid_hashed_secret.var,
-                elegibility_ts.var,
-                expiration_ts.var,
+                eligibility.var,
+                expiration.var,
             );
 
             // Constraint the hash to be equal to the real one
+            let storage_bid: StorageScalar = bid.into();
             composer.constrain_to_constant(
                 bid_hash,
                 BlsScalar::zero(),
-                -StorageScalar::from(bid).0,
+                -storage_bid.0,
             );
         };
         // Proving
