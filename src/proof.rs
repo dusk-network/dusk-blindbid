@@ -396,7 +396,8 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // New Verifier instance
         let mut verifier = Verifier::new(transcript_initialisation);
         // Fill witnesses for Verifier
-        self.gadget(verifier.mut_cs())?;
+        let pi = self.gadget(verifier.mut_cs())?;
+        self.pi_constructor = Some(pi);
         verifier.verifier_key = Some(*verifier_key);
         verifier.verify(proof, &vk, &self.build_pi(pub_inputs)?)
     }
