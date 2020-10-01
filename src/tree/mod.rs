@@ -34,8 +34,8 @@ impl BidTree {
 
     /// Reference to the internal poseidon tree
     ///
-    /// We don't have a mutable reference available because all its mutation should be protected by
-    /// encapsulation
+    /// We don't have a mutable reference available because all its mutation
+    /// should be protected by encapsulation
     pub fn inner(&self) -> &PoseidonTree<Bid, BidAnnotation, Blake2b> {
         &self.tree
     }
@@ -178,7 +178,8 @@ mod tests {
             self.idx = idx;
         }
 
-        /// Create a random bid with all the underlying data except for the tree index
+        /// Create a random bid with all the underlying data except for the tree
+        /// index
         pub fn random<R>(rng: &mut R) -> BidContainer
         where
             R: Rng + CryptoRng,
