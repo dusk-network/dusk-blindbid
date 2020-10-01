@@ -112,13 +112,22 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             AllocatedScalar::allocate(composer, latest_consensus_step);
         let latest_consensus_round =
             AllocatedScalar::allocate(composer, latest_consensus_round);
-        // Decrypt the cypher using the secret and allocate value & blinder
-        let decrypted_data = bid.encrypted_data.decrypt(
-            self.secret
-                .as_ref()
-                .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?,
-            &bid.nonce,
-        )?;
+        // Decrypt the cypher using the secret and allocate value & blinder.
+        // If the decryption fails, we just set the result to an
+        // impossible-to-obtain value.
+        // On that way, verifiers do not get stuck on the process (they don't
+        // care) about the real values here (just about filling the
+        // composer). And provers won't get any info about if this
+        // secret can or not decrypt the cipher.
+        let decrypted_data = bid
+            .encrypted_data
+            .decrypt(
+                self.secret
+                    .as_ref()
+                    .ok_or(CircuitErrors::CircuitInputsNotFound)?,
+                &bid.nonce,
+            )
+            .unwrap_or([BlsScalar::one(), BlsScalar::one()]);
         let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
         let bid_blinder =
             AllocatedScalar::allocate(composer, decrypted_data[1]);
