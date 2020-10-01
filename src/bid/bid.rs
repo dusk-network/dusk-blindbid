@@ -12,7 +12,6 @@ use dusk_plonk::prelude::*;
 use kelvin::{ByteHash, Content, Sink, Source};
 use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
 use poseidon252::sponge::sponge::sponge_hash;
-use poseidon252::StorageScalar;
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
@@ -232,10 +231,7 @@ impl Bid {
 
 impl PartialEq for Bid {
     fn eq(&self, other: &Self) -> bool {
-        let lhs: StorageScalar = self.into();
-        let rhs: StorageScalar = other.into();
-
-        lhs.0.eq(&rhs.0)
+        self.hash().eq(&other.hash())
     }
 }
 

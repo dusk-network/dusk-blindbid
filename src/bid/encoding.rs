@@ -21,8 +21,9 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // structures
 const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
 
-impl Into<StorageScalar> for &Bid {
-    fn into(self) -> StorageScalar {
+impl Bid {
+    /// Calculate the one-way BlsScalar representation of the Bid
+    pub fn hash(&self) -> BlsScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
         let mut words_deposit = Vec::new();
@@ -61,7 +62,13 @@ impl Into<StorageScalar> for &Bid {
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
-        StorageScalar(sponge_hash(&words_deposit))
+        sponge_hash(&words_deposit)
+    }
+}
+
+impl Into<StorageScalar> for &Bid {
+    fn into(self) -> StorageScalar {
+        StorageScalar(self.hash())
     }
 }
 
