@@ -73,6 +73,11 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let latest_consensus_step = self
             .latest_consensus_step
             .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
+        let score = self
+            .score
+            .as_ref()
+            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?
+            .score;
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
@@ -270,7 +275,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 9. Score generation circuit check with the corresponding gadget.
-        prove_correct_score_gadget(
+        let computed_score = prove_correct_score_gadget(
             composer,
             self.score
                 .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?,
@@ -281,6 +286,14 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             latest_consensus_round,
             latest_consensus_step,
         )?;
+        // Constraint the score to be the public one and set it in the PI
+        // constructor.
+        pi.push(PublicInput::BlsScalar(-score, composer.circuit_size()));
+        composer.constrain_to_constant(
+            computed_score,
+            BlsScalar::zero(),
+            -score,
+        );
         // Set the final circuit size as a Circuit struct attribute.
         self.size = composer.circuit_size();
         Ok(pi)

@@ -116,7 +116,7 @@ pub fn prove_correct_score_gadget(
     consensus_round_seed: AllocatedScalar,
     latest_consensus_round: AllocatedScalar,
     latest_consensus_step: AllocatedScalar,
-) -> Result<(), Error> {
+) -> Result<Variable, Error> {
     // Allocate constant one & zero values.
     let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -256,7 +256,7 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
-    Ok(())
+    Ok(score_alloc_scalar.var)
 }
 
 // Given the y parameter, return the y' and it's inverse value.
