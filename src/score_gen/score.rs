@@ -1,5 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
 // Copyright (c) DUSK NETWORK. All rights reserved.
-// Licensed under the MPL 2.0 license. See LICENSE file in the project root for details.”
+
 //! Score generation
 
 use super::errors::ScoreError;
@@ -67,8 +71,8 @@ impl Bid {
         ]);
         let (value, _) = self.decrypt_data(secret)?;
 
-        // Truncate Y to left 128 bits and interpret the result as 128-bit integer.
-        // Keep the right 128 bits as another integer (r1).
+        // Truncate Y to left 128 bits and interpret the result as 128-bit
+        // integer. Keep the right 128 bits as another integer (r1).
         let r1 = BigUint::from_bytes_le(&y.to_bytes()[16..32]);
         let y_prime = BigUint::from_bytes_le(&y.to_bytes()[0..16]);
 
@@ -112,7 +116,7 @@ pub fn prove_correct_score_gadget(
     consensus_round_seed: AllocatedScalar,
     latest_consensus_round: AllocatedScalar,
     latest_consensus_step: AllocatedScalar,
-) -> Result<(), Error> {
+) -> Result<Variable, Error> {
     // Allocate constant one & zero values.
     let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -164,16 +168,16 @@ pub fn prove_correct_score_gadget(
     // Scalar field divided (no modular division) by 2^128.
     // Since the gadget uses an `AllocatedScalar` here, we need to previously
     // constrain it's variable to a constant value: `the order of the
-    // Scalar field divided (no modular division) by 2^128` in this case. Then generate
-    // the `AllocatedScalar` and call the gadget.
+    // Scalar field divided (no modular division) by 2^128` in this case. Then
+    // generate the `AllocatedScalar` and call the gadget.
     let scalar_field_ord_div_2_128_variable = composer
         .add_witness_to_circuit_description(SCALAR_FIELD_ORD_DIV_2_POW_128);
     let scalar_field_ord_div_2_128 = AllocatedScalar {
         var: scalar_field_ord_div_2_128_variable,
         scalar: SCALAR_FIELD_ORD_DIV_2_POW_128,
     };
-    // Now we can call the gadget with all the constraints applied to ensure that the variable
-    // that represents 2^128
+    // Now we can call the gadget with all the constraints applied to ensure
+    // that the variable that represents 2^128
     let third_cond = maybe_equal(composer, scalar_field_ord_div_2_128, r1);
     // 3.4. Finally, constraints for y' checking it's between
     // [0, Order of the ScalarField mod 2^128].
@@ -252,7 +256,7 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
-    Ok(())
+    Ok(score_alloc_scalar.var)
 }
 
 // Given the y parameter, return the y' and it's inverse value.
@@ -359,8 +363,9 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        // Set latest consensus round as the max value so the score gen does not fail
-        // for that but for the proof verification error if that's the case
+        // Set latest consensus round as the max value so the score gen does not
+        // fail for that but for the proof verification error if that's
+        // the case
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_step = BlsScalar::from(2u64);
 
@@ -456,8 +461,9 @@ mod tests {
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        // Set the timestamps to the maximum possible value so the generation of the
-        // score does not fail for that reason but for the proof verification.
+        // Set the timestamps to the maximum possible value so the generation of
+        // the score does not fail for that reason but for the proof
+        // verification.
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_step = BlsScalar::from(2u64);
 

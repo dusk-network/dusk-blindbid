@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) DUSK NETWORK. All rights reserved.
+
 #![allow(non_snake_case)]
 use anyhow::{Error, Result};
 use dusk_blindbid::bid::Bid;
@@ -109,6 +115,7 @@ mod protocol_tests {
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
             PublicInput::BlsScalar(-prover_id, 0),
+            PublicInput::BlsScalar(-score.score, 0),
         ];
         circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
     }
@@ -128,9 +135,9 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = BlsScalar::from(50u64);
+        let latest_consensus_round = BlsScalar::from(50u64);
+        let latest_consensus_step = BlsScalar::from(50u64);
 
         // Append the StorageBid as an StorageScalar to the tree.
         tree.push(bid)?;
@@ -183,6 +190,7 @@ mod protocol_tests {
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
             PublicInput::BlsScalar(-prover_id, 0),
+            PublicInput::BlsScalar(-score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"BidWithEditedScore", &proof, &pi)
@@ -260,6 +268,7 @@ mod protocol_tests {
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
             PublicInput::BlsScalar(-prover_id, 0),
+            PublicInput::BlsScalar(-score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"EditedBidValue", &proof, &pi)
@@ -356,6 +365,7 @@ mod protocol_tests {
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
             PublicInput::BlsScalar(-prover_id, 0),
+            PublicInput::BlsScalar(-score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"ExpiredBid", &proof, &pi)
@@ -453,6 +463,7 @@ mod protocol_tests {
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
             PublicInput::BlsScalar(-prover_id, 0),
+            PublicInput::BlsScalar(-score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"NonElegibleBid", &proof, &pi)

@@ -1,6 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
 // Copyright (c) DUSK NETWORK. All rights reserved.
-// Licensed under the MPL 2.0 license. See LICENSE file in the project root for
-// details.”
+
 //! BlindBidProof module.
 
 use crate::bid::{encoding::preimage_gadget, Bid};
@@ -70,6 +73,11 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let latest_consensus_step = self
             .latest_consensus_step
             .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
+        let score = self
+            .score
+            .as_ref()
+            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?
+            .score;
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
@@ -104,13 +112,22 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             AllocatedScalar::allocate(composer, latest_consensus_step);
         let latest_consensus_round =
             AllocatedScalar::allocate(composer, latest_consensus_round);
-        // Decrypt the cypher using the secret and allocate value & blinder
-        let decrypted_data = bid.encrypted_data.decrypt(
-            self.secret
-                .as_ref()
-                .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?,
-            &bid.nonce,
-        )?;
+        // Decrypt the cypher using the secret and allocate value & blinder.
+        // If the decryption fails, we just set the result to an
+        // impossible-to-obtain value.
+        // On that way, verifiers do not get stuck on the process (they don't
+        // care) about the real values here (just about filling the
+        // composer). And provers won't get any info about if this
+        // secret can or not decrypt the cipher.
+        let decrypted_data = bid
+            .encrypted_data
+            .decrypt(
+                self.secret
+                    .as_ref()
+                    .ok_or(CircuitErrors::CircuitInputsNotFound)?,
+                &bid.nonce,
+            )
+            .unwrap_or([BlsScalar::one(), BlsScalar::one()]);
         let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
         let bid_blinder =
             AllocatedScalar::allocate(composer, decrypted_data[1]);
@@ -264,7 +281,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 9. Score generation circuit check with the corresponding gadget.
-        prove_correct_score_gadget(
+        let computed_score = prove_correct_score_gadget(
             composer,
             self.score
                 .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?,
@@ -275,6 +292,14 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             latest_consensus_round,
             latest_consensus_step,
         )?;
+        // Constraint the score to be the public one and set it in the PI
+        // constructor.
+        pi.push(PublicInput::BlsScalar(-score, composer.circuit_size()));
+        composer.constrain_to_constant(
+            computed_score,
+            BlsScalar::zero(),
+            -score,
+        );
         // Set the final circuit size as a Circuit struct attribute.
         self.size = composer.circuit_size();
         Ok(pi)
