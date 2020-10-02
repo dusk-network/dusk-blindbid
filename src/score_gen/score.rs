@@ -217,11 +217,29 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
     );
 
-    // 4. r2 < Y' we need a 128-bit range_proof
-    let should_be_1 = max_bound(composer, y_prime.scalar, score_alloc_scalar).0;
+    // 4. r2 < Y'
+    let r2_min_y_prime = composer.add(
+        (BlsScalar::one(), r2.var),
+        (-BlsScalar::one(), y_prime.var),
+        BlsScalar::zero(),
+        BlsScalar::zero(),
+    );
+    let r2_min_y_prime_scalar = r2.scalar - y_prime.scalar;
+    let r2_min_y_prime = AllocatedScalar {
+        var: r2_min_y_prime,
+        scalar: r2_min_y_prime_scalar,
+    };
+
+    // One indicates a failure here.
+    let should_be_one = max_bound(
+        composer,
+        BlsScalar::from(2u64).pow(&[128, 0, 0, 0]),
+        r2_min_y_prime,
+    );
+
     // Check that the result of the range_proof is indeed 0 to assert it passed.
     composer.constrain_to_constant(
-        should_be_1,
+        should_be_one.0,
         BlsScalar::one(),
         BlsScalar::zero(),
     );
@@ -256,6 +274,7 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
         BlsScalar::zero(),
     );
+
     Ok(score_alloc_scalar.var)
 }
 
