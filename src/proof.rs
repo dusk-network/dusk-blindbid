@@ -153,6 +153,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             -branch.root,
             composer.circuit_size(),
         ));
+
         // Constraint the bid_tree_root against a PI that represents
         // the root of the Bid tree that lives inside of the `Bid` contract.
         composer.constrain_to_constant(root, BlsScalar::zero(), -branch.root);
@@ -223,6 +224,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             composer.circuit_size(),
             composer.circuit_size() + 1,
         ));
+
         // Assert computed_commitment == announced commitment.
         composer.assert_equal_public_point(computed_c, bid.c);
 
@@ -237,6 +239,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             -bid.hashed_secret,
             composer.circuit_size(),
         ));
+
         // Constraint the secret_k_hash to be equal to the publicly avaliable
         // one.
         composer.constrain_to_constant(
@@ -395,6 +398,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // Fill witnesses for Verifier
         let pi = self.gadget(verifier.mut_cs())?;
         self.pi_constructor = Some(pi);
+        let mut verifier = Verifier::new(transcript_initialisation);
         verifier.verifier_key = Some(*verifier_key);
         verifier.verify(proof, &vk, &self.build_pi(pub_inputs)?)
     }

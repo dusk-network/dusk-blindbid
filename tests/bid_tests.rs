@@ -117,6 +117,19 @@ mod protocol_tests {
             PublicInput::BlsScalar(-prover_id, 0),
             PublicInput::BlsScalar(-score.score, 0),
         ];
+        use dusk_blindbid::score_gen::Score;
+        let mut circuit = BlindBidCircuit {
+            bid: Some(bid),
+            score: Some(Score::default()),
+            secret_k: Some(BlsScalar::one()),
+            secret: Some(AffinePoint::default()),
+            seed: Some(consensus_round_seed),
+            latest_consensus_round: Some(latest_consensus_round),
+            latest_consensus_step: Some(latest_consensus_step),
+            branch: Some(&branch),
+            size: 0,
+            pi_constructor: None,
+        };
         circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
     }
 
