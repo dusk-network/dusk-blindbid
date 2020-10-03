@@ -1,6 +1,6 @@
 [package]
 name = "dusk-blindbid"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 
