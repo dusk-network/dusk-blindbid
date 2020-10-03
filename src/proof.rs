@@ -16,10 +16,7 @@ use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_plonk::prelude::*;
-use plonk_gadgets::{
-    AllocatedScalar, RangeGadgets::max_bound,
-    ScalarGadgets::conditionally_select_one,
-};
+use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
     merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
     StorageScalar,
@@ -49,9 +46,6 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
     ) -> Result<Vec<PublicInput>, Error> {
         // Instantiate PI vector.
         let mut pi = Vec::new();
-        // Generate constant witness values for 0.
-        let zero =
-            composer.add_witness_to_circuit_description(BlsScalar::zero());
         // Check if the inputs were indeed pre-loaded inside of the circuit
         // structure.
         let bid = self
@@ -182,17 +176,29 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 3. t_a >= k_t
+        // k_t - t_a should be > 2^64 which is the max size of the round.
+        let kt_min_ta = composer.add(
+            (BlsScalar::one(), latest_consensus_round.var),
+            (-BlsScalar::one(), bid_eligibility_ts.var),
+            BlsScalar::zero(),
+            BlsScalar::zero(),
+        );
+        let kt_min_ta_scalar =
+            latest_consensus_round.scalar - bid_eligibility_ts.scalar;
+        let kt_min_ta = AllocatedScalar {
+            scalar: kt_min_ta_scalar,
+            var: kt_min_ta,
+        };
+        // Third cond should be one since the range should fail since the op
+        // should be < 0 and therefore become really big.
         let third_cond = max_bound(
             composer,
-            latest_consensus_round.scalar,
-            bid_eligibility_ts,
+            BlsScalar::from(2u64).pow(&[64, 0, 0, 0]),
+            kt_min_ta,
         )
         .0;
-        // We should get a 0 if t_e is greater, but we need this to be one in
-        // order to hold. Therefore we conditionally select one.
-        let third_cond = conditionally_select_one(composer, zero, third_cond);
-        // Constraint third condition to be true.
-        // So basically, that the rangeproofs hold.
+        // Constraint third condition to be one.
+        // So basically, that the rangeproof does not hold.
         composer.constrain_to_constant(
             third_cond,
             BlsScalar::one(),
@@ -200,14 +206,29 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 4. t_e >= k_t
-        let fourth_cond =
-            max_bound(composer, latest_consensus_round.scalar, bid_expiration)
-                .0;
-        // We should get a 0 if t_e is greater, but we need this to be one in
-        // order to hold. Therefore we conditionally select one.
-        let fourth_cond = conditionally_select_one(composer, zero, fourth_cond);
-        // Constraint fourth condition to be true.
-        // So basically, that the rangeproofs hold.
+        // k_t - t_e should be > 2^64 which is the max size of the round.
+        let kt_min_te = composer.add(
+            (BlsScalar::one(), latest_consensus_round.var),
+            (-BlsScalar::one(), bid_expiration.var),
+            BlsScalar::zero(),
+            BlsScalar::zero(),
+        );
+        let kt_min_te_scalar =
+            latest_consensus_round.scalar - bid_expiration.scalar;
+        let kt_min_te = AllocatedScalar {
+            scalar: kt_min_te_scalar,
+            var: kt_min_te,
+        };
+        // Third cond should be one since the range should fail since the op
+        // should be < 0 and therefore become really big.
+        let fourth_cond = max_bound(
+            composer,
+            BlsScalar::from(2u64).pow(&[64, 0, 0, 0]),
+            kt_min_te,
+        )
+        .0;
+        // Constraint third condition to be one.
+        // So basically, that the rangeproof does not hold.
         composer.constrain_to_constant(
             fourth_cond,
             BlsScalar::one(),
