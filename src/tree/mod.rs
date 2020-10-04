@@ -5,18 +5,21 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 use crate::bid::Bid;
-use kelvin::{Blake2b, Branch, Compound, Method};
+use dusk_plonk::prelude::*;
+use kelvin::{Blake2b, Method};
 use nstack::NStack;
-use poseidon252::{PoseidonBranch, PoseidonTree};
+use poseidon252::{
+    extend_storage_scalar, PoseidonBranch, PoseidonTree, PoseidonTreeIterator,
+};
 use std::{io, mem};
 
 pub use annotation::BidAnnotation;
 pub use search::BlockHeightFilter;
-pub use storage::StorageScalar;
 
 pub mod annotation;
 pub mod search;
-pub mod storage;
+
+extend_storage_scalar!(StorageScalar, BlsScalar, Bid);
 
 pub type BidTreeInner = NStack<Bid, BidAnnotation, Blake2b>;
 
@@ -79,58 +82,18 @@ impl BidTree {
     pub fn iter_filtered<M: Method<BidTreeInner, Blake2b>>(
         &self,
         filter: M,
-    ) -> io::Result<BidTreeIterator<M>> {
-        BidTreeIterator::new(&self, filter)
+    ) -> io::Result<PoseidonTreeIterator<Bid, BidAnnotation, Blake2b, M>> {
+        self.tree.iter_filtered(filter)
     }
 
     /// Iterate through the bids from a provided block height
     pub fn iter_at_height<S: Into<StorageScalar>>(
         &self,
         block_height: S,
-    ) -> io::Result<BidTreeIterator<BlockHeightFilter>> {
+    ) -> io::Result<
+        PoseidonTreeIterator<Bid, BidAnnotation, Blake2b, BlockHeightFilter>,
+    > {
         self.iter_filtered(BlockHeightFilter::new(block_height.into()))
-    }
-}
-
-pub struct BidTreeIterator<'a, M: Method<BidTreeInner, Blake2b>> {
-    filter: M,
-    branch: Option<Branch<'a, BidTreeInner, Blake2b>>,
-}
-
-impl<'a, M: Method<BidTreeInner, Blake2b>> BidTreeIterator<'a, M> {
-    pub fn new(tree: &'a BidTree, mut filter: M) -> io::Result<Self> {
-        tree.inner()
-            .inner()
-            .search(&mut filter)
-            .map(|branch| Self { filter, branch })
-    }
-}
-
-impl<'a, M: Method<BidTreeInner, Blake2b>> Iterator for BidTreeIterator<'a, M> {
-    type Item = io::Result<Bid>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let bid = match &self.branch {
-            Some(branch) => **branch,
-            None => return None,
-        };
-
-        let branch = match self.branch.take() {
-            Some(b) => b,
-            None => {
-                return Some(Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Unexpected null!",
-                )))
-            }
-        };
-
-        self.branch = match branch.search(&mut self.filter) {
-            Ok(b) => b,
-            Err(e) => return Some(Err(e)),
-        };
-
-        Some(Ok(bid))
     }
 }
 

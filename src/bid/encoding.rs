@@ -11,7 +11,7 @@
 use super::Bid;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 use dusk_plonk::prelude::*;
-use poseidon252::{sponge::sponge::*, StorageScalar};
+use poseidon252::sponge::sponge::*;
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -69,18 +69,6 @@ impl Bid {
     }
 }
 
-impl Into<StorageScalar> for &Bid {
-    fn into(self) -> StorageScalar {
-        StorageScalar(self.hash())
-    }
-}
-
-impl Into<StorageScalar> for Bid {
-    fn into(self) -> StorageScalar {
-        (&self).into()
-    }
-}
-
 /// Hashes the internal Bid parameters using the Poseidon252 hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
@@ -131,6 +119,7 @@ pub(crate) fn preimage_gadget(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tree::StorageScalar;
     use anyhow::{Error, Result};
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::constraint_system::ecc::Point;
@@ -219,7 +208,7 @@ mod tests {
             composer.constrain_to_constant(
                 bid_hash,
                 BlsScalar::zero(),
-                -storage_bid.0,
+                -storage_bid.s(),
             );
         };
         // Proving

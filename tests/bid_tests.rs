@@ -108,7 +108,7 @@ mod protocol_tests {
 
         let (pk, vk, _) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid: StorageScalar = bid.hash().into();
         let pi = vec![
             PublicInput::BlsScalar(-branch.root, 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
@@ -196,7 +196,7 @@ mod protocol_tests {
         let (pk, vk, _) = circuit.compile(&pub_params)?;
         let proof =
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid: StorageScalar = bid.hash().into();
         let pi = vec![
             PublicInput::BlsScalar(-branch.root, 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
@@ -274,7 +274,7 @@ mod protocol_tests {
 
         let (pk, vk, _) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid: StorageScalar = bid.hash().into();
         let pi = vec![
             PublicInput::BlsScalar(-branch.root, 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
@@ -371,7 +371,7 @@ mod protocol_tests {
 
         let (pk, vk, _) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid: StorageScalar = bid.hash().into();
         let pi = vec![
             PublicInput::BlsScalar(-branch.root, 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
@@ -469,7 +469,7 @@ mod protocol_tests {
 
         let (pk, vk, _) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid: StorageScalar = bid.hash().into();
         let pi = vec![
             PublicInput::BlsScalar(-branch.root, 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
@@ -493,10 +493,10 @@ mod serialization_tests {
     #[test]
     fn from_to_bytes_impl_works() -> Result<()> {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one())?;
-        let bid_hash: StorageScalar = bid.into();
+        let bid_hash: StorageScalar = bid.hash().into();
         let bytes = bid.to_bytes();
         let bid2 = Bid::from_bytes(bytes)?;
-        let bid_hash_2: StorageScalar = bid2.into();
+        let bid_hash_2: StorageScalar = bid2.hash().into();
         assert_eq!(bid_hash.0, bid_hash_2.0);
         Ok(())
     }
