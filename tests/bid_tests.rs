@@ -468,7 +468,7 @@ mod protocol_tests {
         };
 
         let (pk, vk) = circuit.compile(&pub_params)?;
-        let proof = circuit.gen_proof(&pub_params, &pk, b"vec![]legibleBid")?;
+        let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
@@ -479,7 +479,7 @@ mod protocol_tests {
             PublicInput::BlsScalar(score.score, 0),
         ];
         assert!(circuit
-            .verify_proof(&pub_params, &vk, b"vec![]legibleBid", &proof, &pi)
+            .verify_proof(&pub_params, &vk, b"NonElegibleBid", &proof, &pi)
             .is_err());
         Ok(())
     }
