@@ -6,8 +6,8 @@
 
 #![allow(non_snake_case)]
 use anyhow::{Error, Result};
-use dusk_blindbid::bid::Bid;
 use dusk_blindbid::proof::BlindBidCircuit;
+use dusk_blindbid::{bid::Bid, score_gen::Score};
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
@@ -94,41 +94,41 @@ mod protocol_tests {
         );
 
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(score),
-            secret_k: Some(secret_k),
-            secret: Some(secret),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: score,
+            secret_k: secret_k,
+            secret: secret,
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
 
-        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root(), 0),
-            PublicInput::BlsScalar(-storage_bid.0, 0),
+            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(-bid.hashed_secret, 0),
-            PublicInput::BlsScalar(-prover_id, 0),
-            PublicInput::BlsScalar(-score.score, 0),
+            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(prover_id, 0),
+            PublicInput::BlsScalar(score.score, 0),
         ];
-        use dusk_blindbid::score_gen::Score;
+
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(Score::default()),
-            secret_k: Some(BlsScalar::one()),
-            secret: Some(AffinePoint::default()),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: Score::default(),
+            secret_k: BlsScalar::one(),
+            secret: AffinePoint::default(),
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
         circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
     }
@@ -181,29 +181,29 @@ mod protocol_tests {
         );
 
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(score),
-            secret_k: Some(secret_k),
-            secret: Some(secret),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: score,
+            secret_k: secret_k,
+            secret: secret,
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
 
-        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let (pk, vk) = circuit.compile(&pub_params)?;
         let proof =
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root(), 0),
-            PublicInput::BlsScalar(-storage_bid.0, 0),
+            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(-bid.hashed_secret, 0),
-            PublicInput::BlsScalar(-prover_id, 0),
-            PublicInput::BlsScalar(-score.score, 0),
+            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(prover_id, 0),
+            PublicInput::BlsScalar(score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"BidWithEditedScore", &proof, &pi)
@@ -260,28 +260,28 @@ mod protocol_tests {
         bid.hashed_secret = BlsScalar::from(63463245u64);
 
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(score),
-            secret_k: Some(secret_k),
-            secret: Some(secret),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: score,
+            secret_k: secret_k,
+            secret: secret,
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
 
-        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root(), 0),
-            PublicInput::BlsScalar(-storage_bid.0, 0),
+            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(-bid.hashed_secret, 0),
-            PublicInput::BlsScalar(-prover_id, 0),
-            PublicInput::BlsScalar(-score.score, 0),
+            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(prover_id, 0),
+            PublicInput::BlsScalar(score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"EditedBidValue", &proof, &pi)
@@ -357,28 +357,28 @@ mod protocol_tests {
         );
 
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(score),
-            secret_k: Some(secret_k),
-            secret: Some(secret),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: score,
+            secret_k: secret_k,
+            secret: secret,
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
 
-        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root(), 0),
-            PublicInput::BlsScalar(-storage_bid.0, 0),
+            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(-bid.hashed_secret, 0),
-            PublicInput::BlsScalar(-prover_id, 0),
-            PublicInput::BlsScalar(-score.score, 0),
+            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(prover_id, 0),
+            PublicInput::BlsScalar(score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"ExpiredBid", &proof, &pi)
@@ -455,28 +455,28 @@ mod protocol_tests {
         let latest_consensus_round = BlsScalar::from(200u64);
 
         let mut circuit = BlindBidCircuit {
-            bid: Some(bid),
-            score: Some(score),
-            secret_k: Some(secret_k),
-            secret: Some(secret),
-            seed: Some(consensus_round_seed),
-            latest_consensus_round: Some(latest_consensus_round),
-            latest_consensus_step: Some(latest_consensus_step),
-            branch: Some(&branch),
-            size: 0,
-            pi_constructor: None,
+            bid: bid,
+            score: score,
+            secret_k: secret_k,
+            secret: secret,
+            seed: consensus_round_seed,
+            latest_consensus_round: latest_consensus_round,
+            latest_consensus_step: latest_consensus_step,
+            branch: &branch,
+            trim_size: 1 << 15,
+            pi_positions: vec![],
         };
 
-        let (pk, vk, _) = circuit.compile(&pub_params)?;
+        let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root(), 0),
-            PublicInput::BlsScalar(-storage_bid.0, 0),
+            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(-bid.hashed_secret, 0),
-            PublicInput::BlsScalar(-prover_id, 0),
-            PublicInput::BlsScalar(-score.score, 0),
+            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(prover_id, 0),
+            PublicInput::BlsScalar(score.score, 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"NonElegibleBid", &proof, &pi)

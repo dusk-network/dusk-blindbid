@@ -8,7 +8,7 @@
 
 use crate::bid::{encoding::preimage_gadget, Bid};
 use crate::score_gen::*;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,
 };
@@ -22,56 +22,37 @@ use poseidon252::{
     StorageScalar,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct BlindBidCircuit<'a> {
     // Inputs of the circuit.
-    pub bid: Option<Bid>,
-    pub score: Option<Score>,
+    pub bid: Bid,
+    pub score: Score,
     // External fields needed by the circuit.
-    pub secret_k: Option<BlsScalar>,
-    pub seed: Option<BlsScalar>,
-    pub latest_consensus_round: Option<BlsScalar>,
-    pub latest_consensus_step: Option<BlsScalar>,
-    pub branch: Option<&'a PoseidonBranch>,
+    pub secret_k: BlsScalar,
+    pub seed: BlsScalar,
+    pub latest_consensus_round: BlsScalar,
+    pub latest_consensus_step: BlsScalar,
+    pub branch: &'a PoseidonBranch,
     // Required fields to decrypt Bid internal info.
-    pub secret: Option<AffinePoint>,
-    pub size: usize,
-    pub pi_constructor: Option<Vec<PublicInput>>,
+    pub secret: AffinePoint,
+    pub trim_size: usize,
+    pub pi_positions: Vec<PublicInput>,
 }
 
 impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
-    fn gadget(
-        &mut self,
-        composer: &mut StandardComposer,
-    ) -> Result<Vec<PublicInput>, Error> {
-        // Instantiate PI vector.
-        let mut pi = Vec::new();
+    fn gadget(&mut self, composer: &mut StandardComposer) -> Result<()> {
         // Check if the inputs were indeed pre-loaded inside of the circuit
         // structure.
-        let bid = self
-            .bid
-            .as_ref()
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let branch = self
-            .branch
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let secret_k = self
-            .secret_k
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let seed = self
-            .seed
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let latest_consensus_round = self
-            .latest_consensus_round
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let latest_consensus_step = self
-            .latest_consensus_step
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?;
-        let score = self
-            .score
-            .as_ref()
-            .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?
-            .score;
+        let bid = self.bid;
+        let branch = self.branch;
+        let secret_k = self.secret_k;
+        let seed = self.seed;
+        let latest_consensus_round = self.latest_consensus_round;
+        let latest_consensus_step = self.latest_consensus_step;
+        let score = self.score;
+        let secret = self.secret;
+        // Instantiate PI vector.
+        let pi = self.get_mut_pi_positions();
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
@@ -115,12 +96,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // secret can or not decrypt the cipher.
         let decrypted_data = bid
             .encrypted_data
-            .decrypt(
-                self.secret
-                    .as_ref()
-                    .ok_or(CircuitErrors::CircuitInputsNotFound)?,
-                &bid.nonce,
-            )
+            .decrypt(&secret, &bid.nonce)
             .unwrap_or([BlsScalar::one(), BlsScalar::one()]);
         let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
         let bid_blinder =
@@ -303,8 +279,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // 9. Score generation circuit check with the corresponding gadget.
         let computed_score = prove_correct_score_gadget(
             composer,
-            self.score
-                .ok_or_else(|| CircuitErrors::CircuitInputsNotFound)?,
+            score,
             bid_value,
             secret_k,
             bid_tree_root,
@@ -314,109 +289,31 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         )?;
         // Constraint the score to be the public one and set it in the PI
         // constructor.
-        pi.push(PublicInput::BlsScalar(-score, composer.circuit_size()));
+        pi.push(PublicInput::BlsScalar(
+            -score.score,
+            composer.circuit_size(),
+        ));
         composer.constrain_to_constant(
             computed_score,
             BlsScalar::zero(),
-            -score,
+            -score.score,
         );
-        // Set the final circuit size as a Circuit struct attribute.
-        self.size = composer.circuit_size();
-        Ok(pi)
+        Ok(())
     }
 
-    fn compile(
-        &mut self,
-        pub_params: &PublicParameters,
-    ) -> Result<(ProverKey, VerifierKey, usize), Error> {
-        // Setup PublicParams
-        let (ck, _) = pub_params.trim(1 << 16)?;
-        // Generate & save `ProverKey` with some random values.
-        let mut prover = Prover::new(b"TestCircuit");
-        // Set size & PI builder
-        self.pi_constructor = Some(self.gadget(prover.mut_cs())?);
-        prover.preprocess(&ck)?;
-
-        // Generate & save `VerifierKey` with some random values.
-        let mut verifier = Verifier::new(b"TestCircuit");
-        self.gadget(verifier.mut_cs())?;
-        verifier.preprocess(&ck)?;
-        Ok((
-            prover
-                .prover_key
-                .expect("Unexpected error. Missing VerifierKey in compilation")
-                .clone(),
-            verifier
-                .verifier_key
-                .expect("Unexpected error. Missing VerifierKey in compilation"),
-            self.circuit_size(),
-        ))
+    fn get_pi_positions(&self) -> &Vec<PublicInput> {
+        &self.pi_positions
     }
 
-    fn build_pi(&self, pub_inputs: &[PublicInput]) -> Result<Vec<BlsScalar>> {
-        let mut pi = vec![BlsScalar::zero(); self.size];
-        self.pi_constructor
-            .as_ref()
-            .ok_or(CircuitErrors::CircuitInputsNotFound)?
-            .iter()
-            .enumerate()
-            .for_each(|(idx, pi_constr)| {
-                match pi_constr {
-                    PublicInput::BlsScalar(_, pos) => {
-                        pi[*pos] = pub_inputs[idx].value()[0]
-                    }
-                    PublicInput::JubJubScalar(_, pos) => {
-                        pi[*pos] = pub_inputs[idx].value()[0]
-                    }
-                    PublicInput::AffinePoint(_, pos_x, pos_y) => {
-                        let (coord_x, coord_y) = (
-                            pub_inputs[idx].value()[0],
-                            pub_inputs[idx].value()[1],
-                        );
-                        pi[*pos_x] = -coord_x;
-                        pi[*pos_y] = -coord_y;
-                    }
-                };
-            });
-        Ok(pi)
+    fn get_mut_pi_positions(&mut self) -> &mut Vec<PublicInput> {
+        &mut self.pi_positions
     }
 
-    fn circuit_size(&self) -> usize {
-        self.size
+    fn get_trim_size(&self) -> usize {
+        self.trim_size
     }
 
-    fn gen_proof(
-        &mut self,
-        pub_params: &PublicParameters,
-        prover_key: &ProverKey,
-        transcript_initialisation: &'static [u8],
-    ) -> Result<Proof> {
-        let (ck, _) = pub_params.trim(1 << 16)?;
-        // New Prover instance
-        let mut prover = Prover::new(transcript_initialisation);
-        // Fill witnesses for Prover
-        self.gadget(prover.mut_cs())?;
-        // Add ProverKey to Prover
-        prover.prover_key = Some(prover_key.clone());
-        prover.prove(&ck)
-    }
-
-    fn verify_proof(
-        &mut self,
-        pub_params: &PublicParameters,
-        verifier_key: &VerifierKey,
-        transcript_initialisation: &'static [u8],
-        proof: &Proof,
-        pub_inputs: &[PublicInput],
-    ) -> Result<(), Error> {
-        let (_, vk) = pub_params.trim(1 << 16)?;
-        // New Verifier instance
-        let mut verifier = Verifier::new(transcript_initialisation);
-        // Fill witnesses for Verifier
-        let pi = self.gadget(verifier.mut_cs())?;
-        self.pi_constructor = Some(pi);
-        let mut verifier = Verifier::new(transcript_initialisation);
-        verifier.verifier_key = Some(*verifier_key);
-        verifier.verify(proof, &vk, &self.build_pi(pub_inputs)?)
+    fn set_trim_size(&mut self, size: usize) {
+        self.trim_size = size;
     }
 }
