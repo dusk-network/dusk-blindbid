@@ -127,7 +127,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             AllocatedScalar::allocate(composer, decrypted_data[1]);
         // Allocate the bid tree root to be used later by the score_generation
         // gadget.
-        let bid_tree_root = AllocatedScalar::allocate(composer, branch.root);
+        let bid_tree_root = AllocatedScalar::allocate(composer, branch.root());
 
         // ------------------------------------------------------- //
         //                                                         //
@@ -136,21 +136,17 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // ------------------------------------------------------- //
 
         // 1. Merkle Opening
-        let root = merkle_opening_gadget(
-            composer,
-            branch.clone(),
-            bid_hash.var,
-            branch.root,
-        );
+        let root =
+            merkle_opening_gadget(composer, branch.clone(), bid_hash.var);
         // Add PI constraint for the root to the PI constructor
         pi.push(PublicInput::BlsScalar(
-            -branch.root,
+            -branch.root(),
             composer.circuit_size(),
         ));
 
         // Constraint the bid_tree_root against a PI that represents
         // the root of the Bid tree that lives inside of the `Bid` contract.
-        composer.constrain_to_constant(root, BlsScalar::zero(), -branch.root);
+        composer.constrain_to_constant(root, BlsScalar::zero(), -branch.root());
 
         // 2. Bid pre_image check
         let computed_bid_hash = preimage_gadget(

@@ -80,7 +80,7 @@ mod protocol_tests {
         let score = bid.compute_score(
             &secret,
             secret_k,
-            branch.root,
+            branch.root(),
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -110,7 +110,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-branch.root(), 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
@@ -164,7 +164,7 @@ mod protocol_tests {
         let mut score = bid.compute_score(
             &secret,
             secret_k,
-            branch.root,
+            branch.root(),
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -198,7 +198,7 @@ mod protocol_tests {
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-branch.root(), 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
@@ -276,7 +276,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-branch.root(), 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
@@ -338,7 +338,7 @@ mod protocol_tests {
         let score = bid.compute_score(
             &secret,
             secret_k,
-            branch.root,
+            branch.root(),
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -373,7 +373,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-branch.root(), 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
@@ -436,7 +436,7 @@ mod protocol_tests {
         let score = bid.compute_score(
             &secret,
             secret_k,
-            branch.root,
+            branch.root(),
             consensus_round_seed,
             latest_consensus_round,
             latest_consensus_step,
@@ -471,7 +471,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
         let storage_bid: StorageScalar = bid.into();
         let pi = vec![
-            PublicInput::BlsScalar(-branch.root, 0),
+            PublicInput::BlsScalar(-branch.root(), 0),
             PublicInput::BlsScalar(-storage_bid.0, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(-bid.hashed_secret, 0),
