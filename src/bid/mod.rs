@@ -4,8 +4,13 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-pub use bid::Bid;
-use errors::BidGenerationError;
-pub(crate) mod bid;
-pub(crate) mod encoding;
+mod bid;
 mod errors;
+mod zk;
+
+pub use bid::Bid;
+pub use errors::BidGenerationError;
+pub use zk::ZkBid;
+
+#[cfg(test)]
+mod tests;
