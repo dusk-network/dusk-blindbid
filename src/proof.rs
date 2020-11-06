@@ -5,9 +5,10 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! BlindBidProof module.
+#![cfg(feature = "canon")]
 
 use crate::bid::{encoding::preimage_gadget, Bid};
-use crate::score_gen::*;
+use crate::score_gen::{score::prove_correct_score_gadget, Score};
 use anyhow::Result;
 use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,

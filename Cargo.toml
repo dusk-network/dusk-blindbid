@@ -6,9 +6,9 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.0"
-dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.3.0", features = ["canon"]}
-poseidon252 = {git = "https://github.com/dusk-network/poseidon252", branch = "vlopes11/microkelvin-hosted", features = ["canon"]}
-dusk-plonk = {version = "0.3.3", features = ["trace-print", "canon"]}
+dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.3.0"}
+poseidon252 = {git = "https://github.com/dusk-network/poseidon252", tag = "v0.13.1"}
+dusk-plonk = {version = "0.3.3", features = ["trace-print"]}
 num-bigint = "0.3.0"
 num-traits = "0.2.11"
 plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.2"}
@@ -16,7 +16,19 @@ thiserror = "1.0.20"
 rand_core = "0.5.1"
 lazy_static = "1.4.0"
 rand = "0.7"
-nstack = "^0.6"
-canonical = "^0.4"
-canonical_derive = "^0.4"
+canonical = { version = "^0.4", optional = true }
+canonical_derive = { version = "^0.4", optional = true }
+
+[dev-dependencies]
+canonical_host = "^0.4"
+
+[features]
+canon = [
+    "canonical",
+    "canonical_derive",
+    "poseidon252/canon",
+    "dusk-pki/canon",
+    "dusk-plonk/canon"
+]
+canon_host = ["canon", "canonical/host"]
 

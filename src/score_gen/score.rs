@@ -10,9 +10,11 @@ use super::errors::ScoreError;
 use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
 use crate::bid::Bid;
 use anyhow::{Error, Result};
+#[cfg(feature = "canon")]
 use canonical::Canon;
+#[cfg(feature = "canon")]
 use canonical_derive::Canon;
-use dusk_plonk::jubjub::AffinePoint;
+use dusk_plonk::jubjub::AffinePoint as JubJubAffine;
 use dusk_plonk::prelude::*;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
@@ -21,7 +23,8 @@ use plonk_gadgets::{
 };
 use poseidon252::sponge::*;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Canon)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Score {
     pub score: BlsScalar,
     pub(crate) y: BlsScalar,
@@ -52,7 +55,7 @@ impl Bid {
     /// Given a `Bid`, compute it's Score and return it.
     pub fn compute_score(
         &self,
-        secret: &AffinePoint,
+        secret: &JubJubAffine,
         secret_k: BlsScalar,
         bid_tree_root: BlsScalar,
         consensus_round_seed: BlsScalar,
