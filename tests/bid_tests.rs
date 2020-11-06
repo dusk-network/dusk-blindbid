@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
+#![cfg(feature = "canon")]
 use anyhow::{Error, Result};
 use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_blindbid::{bid::Bid, score_gen::Score};

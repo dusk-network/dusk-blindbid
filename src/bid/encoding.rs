@@ -11,7 +11,7 @@
 use super::Bid;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 use dusk_plonk::prelude::*;
-use poseidon252::{sponge::sponge::*, StorageScalar};
+use poseidon252::sponge::sponge::*;
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -19,10 +19,11 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // Type 3 will be JubJubAffine coordinates tuple
 // Type 4 will be u32
 // Type 5 will be PoseidonCipher
+// Type 6 will be u64
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different
 // structures
-const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
+const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
 
 impl Bid {
     /// Calculate the one-way BlsScalar representation of the Bid
@@ -61,6 +62,7 @@ impl Bid {
         // Push the timestamps of the Bid
         words_deposit.push(self.eligibility);
         words_deposit.push(self.expiration);
+        words_deposit.push(BlsScalar::from(self.pos));
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
@@ -69,14 +71,14 @@ impl Bid {
     }
 }
 
-impl Into<StorageScalar> for &Bid {
-    fn into(self) -> StorageScalar {
-        StorageScalar(self.hash())
+impl Into<BlsScalar> for &Bid {
+    fn into(self) -> BlsScalar {
+        self.hash()
     }
 }
 
-impl Into<StorageScalar> for Bid {
-    fn into(self) -> StorageScalar {
+impl Into<BlsScalar> for Bid {
+    fn into(self) -> BlsScalar {
         (&self).into()
     }
 }
@@ -96,6 +98,7 @@ pub(crate) fn preimage_gadget(
     hashed_secret: Variable,
     eligibility: Variable,
     expiration: Variable,
+    pos: Variable,
 ) -> Variable {
     // This field represents the types of the inputs and has to be the same
     // as the default one.
@@ -123,6 +126,8 @@ pub(crate) fn preimage_gadget(
     // Add elebility & expiration timestamps.
     messages.push(eligibility);
     messages.push(expiration);
+    // Add position of the bid in the BidTree
+    messages.push(pos);
 
     // Perform the sponge_hash inside of the Constraint System
     sponge_hash_gadget(composer, &messages)
@@ -204,6 +209,8 @@ mod tests {
                 AllocatedScalar::allocate(composer, bid.eligibility);
             let expiration =
                 AllocatedScalar::allocate(composer, bid.expiration);
+            let pos =
+                AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
             let bid_hash = preimage_gadget(
                 composer,
                 bid_cipher,
@@ -212,14 +219,15 @@ mod tests {
                 bid_hashed_secret.var,
                 eligibility.var,
                 expiration.var,
+                pos.var,
             );
 
             // Constraint the hash to be equal to the real one
-            let storage_bid: StorageScalar = bid.into();
+            let storage_bid = bid.hash();
             composer.constrain_to_constant(
                 bid_hash,
                 BlsScalar::zero(),
-                -storage_bid.0,
+                -storage_bid,
             );
         };
         // Proving

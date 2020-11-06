@@ -10,7 +10,6 @@ pub mod bid;
 pub mod proof;
 pub mod score_gen;
 pub mod tree;
-
 use dusk_plonk::prelude::*;
 
 pub const V_RAW_MIN: u64 = 50_000u64;

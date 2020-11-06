@@ -5,132 +5,76 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 use crate::bid::Bid;
-use kelvin::{Blake2b, Branch, Compound, Method};
-use nstack::NStack;
-use poseidon252::{PoseidonBranch, PoseidonTree};
-use std::{io, mem};
+use anyhow::Result;
+use canonical::{Canon, Store};
+use canonical_derive::Canon;
+use poseidon252::tree::{
+    PoseidonBranch, PoseidonMaxAnnotation, PoseidonTree, PoseidonTreeIterator,
+};
 
-pub use annotation::BidAnnotation;
-pub use search::BlockHeightFilter;
-pub use storage::StorageScalar;
-
-pub mod annotation;
-pub mod search;
-pub mod storage;
-
-pub type BidTreeInner = NStack<Bid, BidAnnotation, Blake2b>;
-
-pub struct BidTree {
-    tree: PoseidonTree<Bid, BidAnnotation, Blake2b>,
+pub const BID_TREE_DEPTH: usize = 17;
+#[derive(Debug, Clone, Canon)]
+pub struct BidTree<S>
+where
+    S: Store,
+{
+    tree: PoseidonTree<Bid, PoseidonMaxAnnotation, S, BID_TREE_DEPTH>,
 }
 
-impl BidTree {
+impl<S> BidTree<S>
+where
+    S: Store,
+{
     /// Constructor
-    pub fn new(depth: usize) -> Self {
-        let tree = PoseidonTree::new(depth);
-
-        Self { tree }
+    pub fn new() -> Self {
+        Self {
+            tree: PoseidonTree::new(),
+        }
     }
 
     /// Reference to the internal poseidon tree
     ///
     /// We don't have a mutable reference available because all its mutation
     /// should be protected by encapsulation
-    pub fn inner(&self) -> &PoseidonTree<Bid, BidAnnotation, Blake2b> {
+    pub fn inner(
+        &self,
+    ) -> &PoseidonTree<Bid, PoseidonMaxAnnotation, S, BID_TREE_DEPTH> {
         &self.tree
     }
 
     /// Get a bid from a provided index
-    pub fn get(&self, idx: u64) -> io::Result<Option<Bid>> {
-        self.tree.get(idx).map(|b| b.map(|b| *b))
-    }
-
-    /// Replace the bid of a provided index
-    ///
-    /// An error is returned if no bid is found
-    pub fn replace(&mut self, idx: u64, bid: Bid) -> io::Result<Bid> {
-        self.tree
-            .get_mut(idx)
-            .and_then(|b| {
-                b.ok_or(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "The bid was not found!",
-                ))
-            })
-            .map(|mut b| mem::replace(&mut *b, bid))
+    pub fn get(&self, idx: u64) -> Result<Option<Bid>> {
+        self.tree.get(idx as usize).map(|b| b.map(|b| b))
     }
 
     /// Append a bid to the tree and return its index
     ///
     /// The index will be the last available position
-    pub fn push(&mut self, bid: Bid) -> io::Result<u64> {
+    pub fn push(&mut self, bid: Bid) -> Result<usize> {
         self.tree.push(bid)
     }
 
     /// Returns a poseidon branch pointing at the specific index
     pub fn poseidon_branch(
         &self,
-        idx: u64,
-    ) -> io::Result<Option<PoseidonBranch>> {
-        self.tree.poseidon_branch(idx)
+        idx: usize,
+    ) -> Result<Option<PoseidonBranch<BID_TREE_DEPTH>>> {
+        self.tree.branch(idx)
     }
 
-    /// Iterate through the bids of the tree using the provided filter
-    pub fn iter_filtered<M: Method<BidTreeInner, Blake2b>>(
+    pub fn iter_block_height(
         &self,
-        filter: M,
-    ) -> io::Result<BidTreeIterator<M>> {
-        BidTreeIterator::new(&self, filter)
-    }
-
-    /// Iterate through the bids from a provided block height
-    pub fn iter_at_height<S: Into<StorageScalar>>(
-        &self,
-        block_height: S,
-    ) -> io::Result<BidTreeIterator<BlockHeightFilter>> {
-        self.iter_filtered(BlockHeightFilter::new(block_height.into()))
-    }
-}
-
-pub struct BidTreeIterator<'a, M: Method<BidTreeInner, Blake2b>> {
-    filter: M,
-    branch: Option<Branch<'a, BidTreeInner, Blake2b>>,
-}
-
-impl<'a, M: Method<BidTreeInner, Blake2b>> BidTreeIterator<'a, M> {
-    pub fn new(tree: &'a BidTree, mut filter: M) -> io::Result<Self> {
-        tree.inner()
-            .inner()
-            .search(&mut filter)
-            .map(|branch| Self { filter, branch })
-    }
-}
-
-impl<'a, M: Method<BidTreeInner, Blake2b>> Iterator for BidTreeIterator<'a, M> {
-    type Item = io::Result<Bid>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let bid = match &self.branch {
-            Some(branch) => **branch,
-            None => return None,
-        };
-
-        let branch = match self.branch.take() {
-            Some(b) => b,
-            None => {
-                return Some(Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Unexpected null!",
-                )))
-            }
-        };
-
-        self.branch = match branch.search(&mut self.filter) {
-            Ok(b) => b,
-            Err(e) => return Some(Err(e)),
-        };
-
-        Some(Ok(bid))
+        block_height: u64,
+    ) -> Result<
+        PoseidonTreeIterator<
+            Bid,
+            PoseidonMaxAnnotation,
+            S,
+            u64,
+            BID_TREE_DEPTH,
+        >,
+    > {
+        self.tree.iter_walk(block_height)
     }
 }
 
@@ -222,7 +166,7 @@ mod tests {
 
     #[test]
     fn block_height_search() {
-        let mut tree = BidTree::new(17);
+        let mut tree = BidTree::new();
         let mut rng_seed = StdRng::seed_from_u64(437894u64);
         let rng = &mut rng_seed;
 
@@ -232,7 +176,7 @@ mod tests {
                 let mut b = BidContainer::random(rng);
 
                 tree.push(b.bid)
-                    .map(|idx| b.set_idx(idx))
+                    .map(|idx| b.set_idx(idx as u64))
                     .expect("Failed to append bid to the tree!");
 
                 b
@@ -241,10 +185,10 @@ mod tests {
 
         // Perform the search on every bid
         bids.iter().for_each(|b| {
-            let block_height = b.bid.eligibility;
+            let block_height = b.bid.eligibility.to_bytes();
             let view_key = b.sk.view_key();
 
-            let results: Vec<Bid> = tree.iter_at_height(block_height).unwrap().filter_map(|b| {
+            let results: Vec<Bid> = tree.iter_block_height(block_height).unwrap().filter_map(|b| {
                 let b = b.unwrap();
 
                 if b.expiration < block_height {

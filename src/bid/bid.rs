@@ -8,24 +8,26 @@
 
 use super::BidGenerationError;
 use anyhow::{Error, Result};
+use canonical::{Canon, Store};
+use canonical_derive::Canon;
+use core::borrow::Borrow;
 use dusk_pki::{Ownable, StealthAddress};
 use dusk_plonk::jubjub::{
     AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_plonk::prelude::*;
-use kelvin::{ByteHash, Content, Sink, Source};
 use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
 use poseidon252::sponge::sponge::sponge_hash;
+use poseidon252::tree::PoseidonLeaf;
 use rand_core::{CryptoRng, RngCore};
-use std::convert::TryFrom;
 use std::io::{self, Read, Write};
 
 /// Size of a serialized Bid.
 /// The size is computed by adding up the `PoseidonCipher` size +
-/// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s.
-pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5;
+/// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s + 1u64.
+pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5 + 8;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Canon)]
 pub struct Bid {
     // b_enc (encrypted value and blinder)
     pub encrypted_data: PoseidonCipher,
@@ -41,6 +43,31 @@ pub struct Bid {
     pub eligibility: BlsScalar,
     // Expiration timestamp
     pub expiration: BlsScalar,
+    // Position of the Bid in the BidTree
+    pub pos: u64,
+}
+
+impl<S> PoseidonLeaf<S> for Bid
+where
+    S: Store,
+{
+    fn poseidon_hash(&self) -> BlsScalar {
+        self.hash()
+    }
+
+    fn pos(&self) -> u64 {
+        self.pos
+    }
+
+    fn set_pos(&mut self, pos: u64) {
+        self.pos = pos
+    }
+}
+
+impl Borrow<u64> for Bid {
+    fn borrow(&self) -> &u64 {
+        &self.pos
+    }
 }
 
 impl Ownable for Bid {
@@ -94,6 +121,7 @@ impl Bid {
             stealth_address: *stealth_address,
             encrypted_data: PoseidonCipher::default(),
             nonce: BlsScalar::default(),
+            pos: 0u64,
         };
 
         bid.set_value(rng, value, secret);
@@ -179,6 +207,7 @@ impl Bid {
         buf[224..256].copy_from_slice(&self.c.to_bytes());
         buf[256..288].copy_from_slice(&self.eligibility.to_bytes());
         buf[288..320].copy_from_slice(&self.expiration.to_bytes());
+        buf[320..BID_SIZE].copy_from_slice(&self.pos.to_le_bytes());
         buf
     }
 
@@ -190,6 +219,7 @@ impl Bid {
         let mut one_cipher = [0u8; ENCRYPTED_DATA_SIZE];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
+        let mut one_u64 = [0u8; 8];
 
         one_cipher[..].copy_from_slice(&bytes[0..ENCRYPTED_DATA_SIZE]);
         let encrypted_data =
@@ -215,6 +245,9 @@ impl Bid {
         one_scalar[..].copy_from_slice(&bytes[288..320]);
         let expiration = read_scalar(&one_scalar)?;
 
+        one_u64[..].copy_from_slice(&bytes[320..BID_SIZE]);
+        let pos = u64::from_le_bytes(one_u64);
+
         Ok(Bid {
             encrypted_data,
             nonce,
@@ -223,6 +256,7 @@ impl Bid {
             c,
             eligibility,
             expiration,
+            pos,
         })
     }
 
@@ -252,6 +286,7 @@ impl Read for Bid {
         n += buf.write(&self.c.to_bytes())?;
         n += buf.write(&self.eligibility.to_bytes())?;
         n += buf.write(&self.expiration.to_bytes())?;
+        n += buf.write(&self.pos.to_le_bytes())?;
 
         buf.flush()?;
         Ok(n)
@@ -281,6 +316,7 @@ impl Write for Bid {
         let mut one_cipher = [0u8; 96];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
+        let mut one_u64 = [0u8; 8];
 
         let mut n = 0;
 
@@ -316,64 +352,14 @@ impl Write for Bid {
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
         self.expiration = read_scalar(&one_scalar)?;
+
+        buf.read_exact(&mut one_u64)?;
+        n += one_u64.len();
+        self.pos = u64::from_le_bytes(one_u64);
         Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
-    }
-}
-
-impl<H: ByteHash> Content<H> for Bid {
-    fn persist(&mut self, sink: &mut Sink<H>) -> io::Result<()> {
-        sink.write_all(&self.encrypted_data.to_bytes())?;
-        sink.write_all(&self.nonce.to_bytes())?;
-        sink.write_all(&self.stealth_address.to_bytes())?;
-        sink.write_all(&self.hashed_secret.to_bytes())?;
-        sink.write_all(&self.c.to_bytes())?;
-        sink.write_all(&self.eligibility.to_bytes())?;
-        sink.write_all(&self.expiration.to_bytes())?;
-        Ok(())
-    }
-
-    fn restore(source: &mut Source<H>) -> io::Result<Self> {
-        let mut one_scalar = [0u8; 32];
-        let mut one_stealth_address = [0u8; 64];
-
-        let mut encrypted_data_cipher = [0u8; ENCRYPTED_DATA_SIZE];
-        source.read_exact(&mut encrypted_data_cipher)?;
-        let encrypted_data = PoseidonCipher::from_bytes(&encrypted_data_cipher)
-            .ok_or(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Could not recover PoseidonCipher from bytes"),
-            ))?;
-
-        source.read_exact(&mut one_scalar)?;
-        let nonce = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_stealth_address)?;
-        let stealth_address = StealthAddress::try_from(&one_stealth_address)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let hashed_secret = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let commitment = read_jubjub_affine(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let eligibility = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let expiration = read_scalar(&one_scalar)?;
-
-        Ok(Bid {
-            encrypted_data,
-            nonce,
-            stealth_address,
-            hashed_secret,
-            c: commitment,
-            eligibility,
-            expiration,
-        })
     }
 }

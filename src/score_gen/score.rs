@@ -10,6 +10,8 @@ use super::errors::ScoreError;
 use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
 use crate::bid::Bid;
 use anyhow::{Error, Result};
+use canonical::Canon;
+use canonical_derive::Canon;
 use dusk_plonk::jubjub::AffinePoint;
 use dusk_plonk::prelude::*;
 use num_bigint::BigUint;
@@ -19,7 +21,7 @@ use plonk_gadgets::{
 };
 use poseidon252::sponge::*;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Canon)]
 pub struct Score {
     pub score: BlsScalar,
     pub(crate) y: BlsScalar,
