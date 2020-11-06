@@ -28,8 +28,8 @@ use std::io::{self, Read, Write};
 
 /// Size of a serialized Bid.
 /// The size is computed by adding up the `PoseidonCipher` size +
-/// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s + 1u64.
-pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5 + 8;
+/// `StealthAddress` size + 1 `AffinePoint` + 2 `BlsScalar`s + 3 u64's.
+pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 3 + 8 * 3;
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
@@ -45,9 +45,9 @@ pub struct Bid {
     // c (Pedersen Commitment)
     pub c: AffinePoint,
     // Elegibility timestamp
-    pub eligibility: BlsScalar,
+    pub eligibility: u64,
     // Expiration timestamp
-    pub expiration: BlsScalar,
+    pub expiration: u64,
     // Position of the Bid in the BidTree
     pub pos: u64,
 }
@@ -90,8 +90,8 @@ impl Bid {
         value: &JubJubScalar,
         secret: &AffinePoint,
         secret_k: BlsScalar,
-        eligibility: BlsScalar,
-        expiration: BlsScalar,
+        eligibility: u64,
+        expiration: u64,
     ) -> Result<Self, Error>
     where
         R: RngCore + CryptoRng,
@@ -212,9 +212,9 @@ impl Bid {
         buf[128..192].copy_from_slice(&self.stealth_address.to_bytes());
         buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
         buf[224..256].copy_from_slice(&self.c.to_bytes());
-        buf[256..288].copy_from_slice(&self.eligibility.to_bytes());
-        buf[288..320].copy_from_slice(&self.expiration.to_bytes());
-        buf[320..BID_SIZE].copy_from_slice(&self.pos.to_le_bytes());
+        buf[256..264].copy_from_slice(&self.eligibility.to_le_bytes());
+        buf[264..272].copy_from_slice(&self.expiration.to_le_bytes());
+        buf[272..BID_SIZE].copy_from_slice(&self.pos.to_le_bytes());
         buf
     }
 
@@ -246,13 +246,13 @@ impl Bid {
         one_scalar[..].copy_from_slice(&bytes[224..256]);
         let c = read_jubjub_affine(&one_scalar)?;
 
-        one_scalar[..].copy_from_slice(&bytes[256..288]);
-        let eligibility = read_scalar(&one_scalar)?;
+        one_scalar[..].copy_from_slice(&bytes[256..264]);
+        let eligibility = u64::from_le_bytes(one_u64);
 
-        one_scalar[..].copy_from_slice(&bytes[288..320]);
-        let expiration = read_scalar(&one_scalar)?;
+        one_scalar[..].copy_from_slice(&bytes[264..272]);
+        let expiration = u64::from_le_bytes(one_u64);
 
-        one_u64[..].copy_from_slice(&bytes[320..BID_SIZE]);
+        one_u64[..].copy_from_slice(&bytes[272..BID_SIZE]);
         let pos = u64::from_le_bytes(one_u64);
 
         Ok(Bid {
@@ -268,7 +268,7 @@ impl Bid {
     }
 
     /// Check if the bid is eligible for the provided block height
-    pub fn eligible(&self, block_height: &BlsScalar) -> bool {
+    pub fn eligible(&self, block_height: &u64) -> bool {
         &self.eligibility <= block_height && block_height <= &self.expiration
     }
 }
@@ -291,8 +291,8 @@ impl Read for Bid {
         n += buf.write(&self.stealth_address.to_bytes())?;
         n += buf.write(&self.hashed_secret.to_bytes())?;
         n += buf.write(&self.c.to_bytes())?;
-        n += buf.write(&self.eligibility.to_bytes())?;
-        n += buf.write(&self.expiration.to_bytes())?;
+        n += buf.write(&self.eligibility.to_le_bytes())?;
+        n += buf.write(&self.expiration.to_le_bytes())?;
         n += buf.write(&self.pos.to_le_bytes())?;
 
         buf.flush()?;
@@ -354,11 +354,11 @@ impl Write for Bid {
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.eligibility = read_scalar(&one_scalar)?;
+        self.eligibility = u64::from_le_bytes(one_u64);
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.expiration = read_scalar(&one_scalar)?;
+        self.expiration = u64::from_le_bytes(one_u64);
 
         buf.read_exact(&mut one_u64)?;
         n += one_u64.len();

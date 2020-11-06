@@ -83,6 +83,7 @@ mod tests {
     use crate::bid::Bid;
     use crate::tree::BidTree;
     use crate::{V_RAW_MAX, V_RAW_MIN};
+    use canonical_host::MemStore;
     use dusk_pki::SecretSpendKey;
     use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
     use dusk_plonk::prelude::*;
@@ -143,8 +144,8 @@ mod tests {
                 (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
             let value = JubJubScalar::from(value);
 
-            let a = BlsScalar::random(rng);
-            let b = BlsScalar::random(rng);
+            let a = rng.gen_range(0u64, u64::MAX);
+            let b = rng.gen_range(0u64, u64::MAX);
 
             let elegibility = cmp::min(a, b);
             let expiration = cmp::max(a, b);
@@ -166,7 +167,7 @@ mod tests {
 
     #[test]
     fn block_height_search() {
-        let mut tree = BidTree::new();
+        let mut tree = BidTree::<MemStore>::new();
         let mut rng_seed = StdRng::seed_from_u64(437894u64);
         let rng = &mut rng_seed;
 
@@ -185,7 +186,7 @@ mod tests {
 
         // Perform the search on every bid
         bids.iter().for_each(|b| {
-            let block_height = b.bid.eligibility.to_bytes();
+            let block_height = b.bid.eligibility;
             let view_key = b.sk.view_key();
 
             let results: Vec<Bid> = tree.iter_block_height(block_height).unwrap().filter_map(|b| {

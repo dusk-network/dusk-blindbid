@@ -60,8 +60,8 @@ impl Bid {
         words_deposit.push(self.c.get_x());
         words_deposit.push(self.c.get_y());
         // Push the timestamps of the Bid
-        words_deposit.push(self.eligibility);
-        words_deposit.push(self.expiration);
+        words_deposit.push(BlsScalar::from(self.eligibility));
+        words_deposit.push(BlsScalar::from(self.expiration));
         words_deposit.push(BlsScalar::from(self.pos));
 
         // Once all of the words are translated as `Scalar` and stored
@@ -86,6 +86,7 @@ impl Into<BlsScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon252 hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
+#[allow(dead_code)]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.
@@ -154,8 +155,8 @@ mod tests {
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
-        let eligibility = -BlsScalar::one();
-        let expiration = -BlsScalar::one();
+        let eligibility = u64::MAX;
+        let expiration = u64::MAX;
 
         Bid::new(
             &mut rng,
@@ -205,10 +206,14 @@ mod tests {
                     bid.stealth_address.R().into(),
                 ),
             );
-            let eligibility =
-                AllocatedScalar::allocate(composer, bid.eligibility);
-            let expiration =
-                AllocatedScalar::allocate(composer, bid.expiration);
+            let eligibility = AllocatedScalar::allocate(
+                composer,
+                BlsScalar::from(bid.eligibility),
+            );
+            let expiration = AllocatedScalar::allocate(
+                composer,
+                BlsScalar::from(bid.expiration),
+            );
             let pos =
                 AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
             let bid_hash = preimage_gadget(

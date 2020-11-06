@@ -58,13 +58,18 @@ impl Bid {
         secret: &JubJubAffine,
         secret_k: BlsScalar,
         bid_tree_root: BlsScalar,
-        consensus_round_seed: BlsScalar,
-        latest_consensus_round: BlsScalar,
-        latest_consensus_step: BlsScalar,
+        consensus_round_seed: u64,
+        latest_consensus_round: u64,
+        latest_consensus_step: u64,
     ) -> Result<Score, Error> {
-        if latest_consensus_round.reduce() > self.expiration.reduce() {
+        if latest_consensus_round > self.expiration {
             return Err(ScoreError::ExpiredBid.into());
         };
+
+        let consensus_round_seed = BlsScalar::from(consensus_round_seed);
+        let latest_consensus_round = BlsScalar::from(latest_consensus_round);
+        let latest_consensus_step = BlsScalar::from(latest_consensus_step);
+
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
         // latest_consensus_round, latest_consensus_step)`.
         let y = sponge::sponge_hash(&[
@@ -312,8 +317,8 @@ mod tests {
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
-        let eligibility = -BlsScalar::one();
-        let expiration = -BlsScalar::one();
+        let eligibility = u64::MAX;
+        let expiration = u64::MAX;
 
         Bid::new(
             &mut rng,
@@ -386,12 +391,12 @@ mod tests {
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = 3u64;
         // Set latest consensus round as the max value so the score gen does not
         // fail for that but for the proof verification error if that's
         // the case
-        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::from(2u64);
+        let latest_consensus_round = 25519u64;
+        let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
         let score = bid.compute_score(
@@ -418,9 +423,9 @@ mod tests {
             value,
             secret_k,
             bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
         prove_correct_score_gadget(
             prover.mut_cs(),
@@ -450,9 +455,9 @@ mod tests {
             value,
             secret_k,
             bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
         prove_correct_score_gadget(
             verifier.mut_cs(),
@@ -484,12 +489,12 @@ mod tests {
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = 5u64;
         // Set the timestamps to the maximum possible value so the generation of
         // the score does not fail for that reason but for the proof
         // verification.
-        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::from(2u64);
+        let latest_consensus_round = 25519u64;
+        let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
         let mut score = bid.compute_score(
@@ -518,9 +523,9 @@ mod tests {
             value,
             secret_k,
             bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
         prove_correct_score_gadget(
             prover.mut_cs(),
@@ -550,9 +555,9 @@ mod tests {
             value,
             secret_k,
             bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
         prove_correct_score_gadget(
             verifier.mut_cs(),

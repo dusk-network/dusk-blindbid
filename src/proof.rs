@@ -77,10 +77,14 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
                 bid.stealth_address.R().into(),
             ),
         );
-        let bid_eligibility_ts =
-            AllocatedScalar::allocate(composer, bid.eligibility);
-        let bid_expiration =
-            AllocatedScalar::allocate(composer, bid.expiration);
+        let bid_eligibility_ts = AllocatedScalar::allocate(
+            composer,
+            BlsScalar::from(bid.eligibility),
+        );
+        let bid_expiration = AllocatedScalar::allocate(
+            composer,
+            BlsScalar::from(bid.expiration),
+        );
         let pos = AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
         // Allocate bid-needed inputs
         let secret_k = AllocatedScalar::allocate(composer, secret_k);

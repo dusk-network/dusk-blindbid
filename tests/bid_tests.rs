@@ -31,8 +31,8 @@ fn random_bid(
     let value = JubJubScalar::from(value);
     // Set the timestamps as the max values so the proofs do not fail for them
     // (never expired or non-elegible).
-    let elegibility_ts = -BlsScalar::from(90u64);
-    let expiration_ts = -BlsScalar::from(90u64);
+    let elegibility_ts = u64::MAX;
+    let expiration_ts = u64::MAX;
 
     Bid::new(
         &mut rng,
@@ -65,9 +65,9 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::from(50u64);
-        let latest_consensus_round = BlsScalar::from(50u64);
-        let latest_consensus_step = BlsScalar::from(50u64);
+        let consensus_round_seed = 2u64;
+        let latest_consensus_round = 50u64;
+        let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
         tree.push(bid)?;
@@ -89,19 +89,19 @@ mod protocol_tests {
 
         let prover_id = bid.generate_prover_id(
             secret_k,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
 
         let mut circuit = BlindBidCircuit {
-            bid: bid,
-            score: score,
-            secret_k: secret_k,
-            secret: secret,
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            bid,
+            score,
+            secret_k,
+            secret,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
@@ -124,9 +124,9 @@ mod protocol_tests {
             score: Score::default(),
             secret_k: BlsScalar::one(),
             secret: JubJubAffine::default(),
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
@@ -149,9 +149,9 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k)?;
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::from(50u64);
-        let latest_consensus_round = BlsScalar::from(50u64);
-        let latest_consensus_step = BlsScalar::from(50u64);
+        let consensus_round_seed = 1u64;
+        let latest_consensus_round = 50u64;
+        let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
         tree.push(bid)?;
@@ -176,19 +176,19 @@ mod protocol_tests {
         score.score = score.score + BlsScalar::from(100u64);
         let prover_id = bid.generate_prover_id(
             secret_k,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
 
         let mut circuit = BlindBidCircuit {
             bid: bid,
-            score: score,
-            secret_k: secret_k,
-            secret: secret,
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            score,
+            secret_k,
+            secret,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
@@ -228,9 +228,9 @@ mod protocol_tests {
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
+        let consensus_round_seed = 4u64;
+        let latest_consensus_round = 25519u64;
+        let latest_consensus_step = 25519u64;
 
         // Append the Bid to the tree.
         tree.push(bid)?;
@@ -252,9 +252,9 @@ mod protocol_tests {
 
         let prover_id = bid.generate_prover_id(
             secret_k,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
 
         // Edit the Bid in order to cheat and get a bigger Score/whatever.
@@ -262,12 +262,12 @@ mod protocol_tests {
 
         let mut circuit = BlindBidCircuit {
             bid: bid,
-            score: score,
-            secret_k: secret_k,
-            secret: secret,
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            score,
+            secret_k,
+            secret,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
@@ -309,8 +309,8 @@ mod protocol_tests {
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
-        let expiration_ts = BlsScalar::from(100u64);
-        let elegibility_ts = BlsScalar::from(1000u64);
+        let expiration_ts = 100u64;
+        let elegibility_ts = 1000u64;
         let bid = Bid::new(
             &mut rng,
             &stealth_addr,
@@ -331,9 +331,9 @@ mod protocol_tests {
 
         // We first generate the score as if the bid wasn't expired. Otherways
         // the score generation would fail since the Bid would be expired.
-        let latest_consensus_round = BlsScalar::from(3u64);
-        let latest_consensus_step = BlsScalar::one();
-        let consensus_round_seed = BlsScalar::random(&mut rng);
+        let latest_consensus_round = 3u64;
+        let latest_consensus_step = 1u64;
+        let consensus_round_seed = 25519u64;
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = bid.compute_score(
@@ -348,23 +348,23 @@ mod protocol_tests {
         // Latest consensus step should be lower than the expiration_ts, in this
         // case is not so the proof should fail since the Bid is expired
         // at this round.
-        let latest_consensus_round = BlsScalar::from(200u64);
+        let latest_consensus_round = 200u64;
 
         let prover_id = bid.generate_prover_id(
             secret_k,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
 
         let mut circuit = BlindBidCircuit {
             bid: bid,
-            score: score,
-            secret_k: secret_k,
-            secret: secret,
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            score,
+            secret_k,
+            secret,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
@@ -406,8 +406,8 @@ mod protocol_tests {
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
-        let expiration_ts = BlsScalar::from(100u64);
-        let elegibility_ts = BlsScalar::from(1000u64);
+        let expiration_ts = 100u64;
+        let elegibility_ts = 1000u64;
         let bid = Bid::new(
             &mut rng,
             &stealth_addr,
@@ -429,9 +429,9 @@ mod protocol_tests {
         // We first generate the score as if the bid was still eligible.
         // Otherways the score generation would fail since the Bid
         // wouldn't be elegible.
-        let latest_consensus_round = BlsScalar::from(3u64);
-        let latest_consensus_step = BlsScalar::one();
-        let consensus_round_seed = BlsScalar::random(&mut rng);
+        let latest_consensus_round = 3u64;
+        let latest_consensus_step = 1u64;
+        let consensus_round_seed = 25519u64;
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = bid.compute_score(
@@ -445,24 +445,24 @@ mod protocol_tests {
 
         let prover_id = bid.generate_prover_id(
             secret_k,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
+            BlsScalar::from(consensus_round_seed),
+            BlsScalar::from(latest_consensus_round),
+            BlsScalar::from(latest_consensus_step),
         );
 
         // Latest consensus step should be lower than the elegibility_ts, in
         // this case is not so the proof should fail since the Bid is
         // non elegible anymore.
-        let latest_consensus_round = BlsScalar::from(200u64);
+        let latest_consensus_round = 200u64;
 
         let mut circuit = BlindBidCircuit {
             bid: bid,
-            score: score,
-            secret_k: secret_k,
-            secret: secret,
-            seed: consensus_round_seed,
-            latest_consensus_round: latest_consensus_round,
-            latest_consensus_step: latest_consensus_step,
+            score,
+            secret_k,
+            secret,
+            seed: BlsScalar::from(consensus_round_seed),
+            latest_consensus_round: BlsScalar::from(latest_consensus_round),
+            latest_consensus_step: BlsScalar::from(latest_consensus_step),
             branch: &branch,
             trim_size: 1 << 15,
             pi_positions: vec![],
