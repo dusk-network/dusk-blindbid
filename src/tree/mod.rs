@@ -77,7 +77,7 @@ where
         self.tree.iter_walk(block_height)
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use crate::bid::Bid;
@@ -215,3 +215,4 @@ mod tests {
         });
     }
 }
+*/

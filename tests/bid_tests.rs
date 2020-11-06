@@ -7,12 +7,12 @@
 #![allow(non_snake_case)]
 #![cfg(feature = "canon")]
 use anyhow::{Error, Result};
+use canonical_host::MemStore;
 use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_blindbid::{bid::Bid, score_gen::Score};
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
-use dusk_plonk::jubjub::{AffinePoint, GENERATOR_EXTENDED};
+use dusk_plonk::jubjub::{AffinePoint as JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
-use poseidon252::StorageScalar;
 use rand::Rng;
 
 const V_RAW_MIN: u64 = 50_000u64;
@@ -57,24 +57,24 @@ mod protocol_tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
         // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new(17usize);
+        let mut tree = BidTree::<MemStore>::new();
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid = random_bid(&secret, secret_k)?;
-        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
+        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
         let consensus_round_seed = BlsScalar::from(50u64);
         let latest_consensus_round = BlsScalar::from(50u64);
         let latest_consensus_step = BlsScalar::from(50u64);
 
-        // Append the StorageBid as an StorageScalar to the tree.
+        // Append the Bid to the tree.
         tree.push(bid)?;
 
         // Extract the branch
         let branch = tree
-            .poseidon_branch(0u64)?
+            .poseidon_branch(0usize)?
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
@@ -109,10 +109,10 @@ mod protocol_tests {
 
         let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid = bid.hash();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
-            PublicInput::BlsScalar(storage_bid.0, 0),
+            PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
             PublicInput::BlsScalar(prover_id, 0),
@@ -123,7 +123,7 @@ mod protocol_tests {
             bid: bid,
             score: Score::default(),
             secret_k: BlsScalar::one(),
-            secret: AffinePoint::default(),
+            secret: JubJubAffine::default(),
             seed: consensus_round_seed,
             latest_consensus_round: latest_consensus_round,
             latest_consensus_step: latest_consensus_step,
@@ -141,24 +141,24 @@ mod protocol_tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
         // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new(17usize);
+        let mut tree = BidTree::<MemStore>::new();
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid = random_bid(&secret, secret_k)?;
-        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
+        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
         let consensus_round_seed = BlsScalar::from(50u64);
         let latest_consensus_round = BlsScalar::from(50u64);
         let latest_consensus_step = BlsScalar::from(50u64);
 
-        // Append the StorageBid as an StorageScalar to the tree.
+        // Append the Bid to the tree.
         tree.push(bid)?;
 
         // Extract the branch
         let branch = tree
-            .poseidon_branch(0u64)?
+            .poseidon_branch(0usize)?
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
@@ -197,10 +197,10 @@ mod protocol_tests {
         let (pk, vk) = circuit.compile(&pub_params)?;
         let proof =
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid = bid.hash();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
-            PublicInput::BlsScalar(storage_bid.0, 0),
+            PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
             PublicInput::BlsScalar(prover_id, 0),
@@ -219,25 +219,25 @@ mod protocol_tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
         // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new(17usize);
+        let mut tree = BidTree::<MemStore>::new();
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let mut bid = random_bid(&secret, secret_k)?;
-        let secret: AffinePoint = (GENERATOR_EXTENDED * &secret).into();
+        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_round = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_step = BlsScalar::random(&mut rand::thread_rng());
 
-        // Append the StorageBid as an StorageScalar to the tree.
+        // Append the Bid to the tree.
         tree.push(bid)?;
 
         // Extract the branch
         let branch = tree
-            .poseidon_branch(0u64)?
+            .poseidon_branch(0usize)?
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
@@ -275,10 +275,10 @@ mod protocol_tests {
 
         let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid = bid.hash();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
-            PublicInput::BlsScalar(storage_bid.0, 0),
+            PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
             PublicInput::BlsScalar(prover_id, 0),
@@ -297,14 +297,14 @@ mod protocol_tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
         // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new(17usize);
+        let mut tree = BidTree::<MemStore>::new();
 
         // Create an expired bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
         let pk_r = PublicSpendKey::from(SecretSpendKey::default());
         let stealth_addr = pk_r.gen_stealth_address(&secret);
-        let secret = AffinePoint::from(GENERATOR_EXTENDED * secret);
+        let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
@@ -321,12 +321,12 @@ mod protocol_tests {
             expiration_ts,
         )?;
 
-        // Append the StorageBid as an StorageScalar to the tree.
+        // Append the Bid to the tree.
         tree.push(bid)?;
 
         // Extract the branch
         let branch = tree
-            .poseidon_branch(0u64)?
+            .poseidon_branch(0usize)?
             .expect("Poseidon Branch Extraction");
 
         // We first generate the score as if the bid wasn't expired. Otherways
@@ -372,10 +372,10 @@ mod protocol_tests {
 
         let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid = bid.hash();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
-            PublicInput::BlsScalar(storage_bid.0, 0),
+            PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
             PublicInput::BlsScalar(prover_id, 0),
@@ -394,14 +394,14 @@ mod protocol_tests {
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
         // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new(17usize);
+        let mut tree = BidTree::<MemStore>::new();
 
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
         let pk_r = PublicSpendKey::from(SecretSpendKey::default());
         let stealth_addr = pk_r.gen_stealth_address(&secret);
-        let secret = AffinePoint::from(GENERATOR_EXTENDED * secret);
+        let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
         let value: u64 = (&mut rand::thread_rng())
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
@@ -418,12 +418,12 @@ mod protocol_tests {
             expiration_ts,
         )?;
 
-        // Append the StorageBid as an StorageScalar to the tree.
+        // Append the Bid to the tree.
         tree.push(bid)?;
 
         // Extract the branch
         let branch = tree
-            .poseidon_branch(0u64)?
+            .poseidon_branch(0usize)?
             .expect("Poseidon Branch Extraction");
 
         // We first generate the score as if the bid was still eligible.
@@ -470,10 +470,10 @@ mod protocol_tests {
 
         let (pk, vk) = circuit.compile(&pub_params)?;
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
-        let storage_bid: StorageScalar = bid.into();
+        let storage_bid = bid.hash();
         let pi = vec![
             PublicInput::BlsScalar(branch.root(), 0),
-            PublicInput::BlsScalar(storage_bid.0, 0),
+            PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
             PublicInput::BlsScalar(prover_id, 0),
@@ -489,15 +489,14 @@ mod protocol_tests {
 #[cfg(test)]
 mod serialization_tests {
     use super::*;
-    use poseidon252::StorageScalar;
 
     #[test]
     fn from_to_bytes_impl_works() -> Result<()> {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one())?;
-        let bid_hash: StorageScalar = bid.into();
+        let bid_hash = bid.hash();
         let bytes = bid.to_bytes();
         let bid2 = Bid::from_bytes(bytes)?;
-        let bid_hash_2: StorageScalar = bid2.into();
+        let bid_hash_2 = bid2.hash();
         assert_eq!(bid_hash.0, bid_hash_2.0);
         Ok(())
     }

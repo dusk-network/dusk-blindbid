@@ -8,8 +8,11 @@
 
 use super::BidGenerationError;
 use anyhow::{Error, Result};
+#[cfg(feature = "canon")]
 use canonical::{Canon, Store};
+#[cfg(feature = "canon")]
 use canonical_derive::Canon;
+#[cfg(feature = "canon")]
 use core::borrow::Borrow;
 use dusk_pki::{Ownable, StealthAddress};
 use dusk_plonk::jubjub::{
@@ -18,6 +21,7 @@ use dusk_plonk::jubjub::{
 use dusk_plonk::prelude::*;
 use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
 use poseidon252::sponge::sponge::sponge_hash;
+#[cfg(feature = "canon")]
 use poseidon252::tree::PoseidonLeaf;
 use rand_core::{CryptoRng, RngCore};
 use std::io::{self, Read, Write};
@@ -27,7 +31,8 @@ use std::io::{self, Read, Write};
 /// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s + 1u64.
 pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5 + 8;
 
-#[derive(Copy, Clone, Debug, Canon)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
     // b_enc (encrypted value and blinder)
     pub encrypted_data: PoseidonCipher,
@@ -47,6 +52,7 @@ pub struct Bid {
     pub pos: u64,
 }
 
+#[cfg(feature = "canon")]
 impl<S> PoseidonLeaf<S> for Bid
 where
     S: Store,
@@ -64,6 +70,7 @@ where
     }
 }
 
+#[cfg(feature = "canon")]
 impl Borrow<u64> for Bid {
     fn borrow(&self) -> &u64 {
         &self.pos
