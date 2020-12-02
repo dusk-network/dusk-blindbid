@@ -29,8 +29,9 @@ std = [
     "anyhow",
     "dusk-jubjub/std",
     "dusk-bls12_381/std",
+    "dusk-plonk/default"
     "poseidon252/default",
-    "dusk-plonk",
+    "plonk_gadgets",
     "num-bigint",
     "num-traits",
     "rand/default",
