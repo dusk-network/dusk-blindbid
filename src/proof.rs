@@ -5,21 +5,19 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! BlindBidProof module.
-
 use crate::bid::{encoding::preimage_gadget, Bid};
-use crate::score_gen::*;
-use anyhow::Result;
+use crate::score_gen::{score::prove_correct_score_gadget, Score};
+use anyhow::{anyhow, Result};
+use dusk_bls12_381::BlsScalar;
+use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,
-};
-use dusk_plonk::jubjub::{
-    AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
-    merkle_proof::merkle_opening_gadget, sponge::sponge::*, PoseidonBranch,
-    StorageScalar,
+    sponge::sponge::sponge_hash_gadget,
+    tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 
 #[derive(Debug, Clone)]
@@ -32,9 +30,9 @@ pub struct BlindBidCircuit<'a> {
     pub seed: BlsScalar,
     pub latest_consensus_round: BlsScalar,
     pub latest_consensus_step: BlsScalar,
-    pub branch: &'a PoseidonBranch,
+    pub branch: &'a PoseidonBranch<17>,
     // Required fields to decrypt Bid internal info.
-    pub secret: AffinePoint,
+    pub secret: JubJubAffine,
     pub trim_size: usize,
     pub pi_positions: Vec<PublicInput>,
 }
@@ -56,8 +54,8 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
-        let storage_bid: StorageScalar = bid.into();
-        let bid_hash = AllocatedScalar::allocate(composer, storage_bid.0);
+        let storage_bid: BlsScalar = bid.into();
+        let bid_hash = AllocatedScalar::allocate(composer, storage_bid);
         // Allocate Bid-internal fields
         let bid_hashed_secret =
             AllocatedScalar::allocate(composer, bid.hashed_secret);
@@ -76,10 +74,15 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
                 bid.stealth_address.R().into(),
             ),
         );
-        let bid_eligibility_ts =
-            AllocatedScalar::allocate(composer, bid.eligibility);
-        let bid_expiration =
-            AllocatedScalar::allocate(composer, bid.expiration);
+        let bid_eligibility_ts = AllocatedScalar::allocate(
+            composer,
+            BlsScalar::from(bid.eligibility),
+        );
+        let bid_expiration = AllocatedScalar::allocate(
+            composer,
+            BlsScalar::from(bid.expiration),
+        );
+        let pos = AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
         // Allocate bid-needed inputs
         let secret_k = AllocatedScalar::allocate(composer, secret_k);
         let seed = AllocatedScalar::allocate(composer, seed);
@@ -112,8 +115,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // ------------------------------------------------------- //
 
         // 1. Merkle Opening
-        let root =
-            merkle_opening_gadget(composer, branch.clone(), bid_hash.var);
+        let root = merkle_opening_gadget(composer, branch, bid_hash.var);
         // Add PI constraint for the root to the PI constructor
         pi.push(PublicInput::BlsScalar(
             -branch.root(),
@@ -133,6 +135,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             bid_hashed_secret.var,
             bid_eligibility_ts.var,
             bid_expiration.var,
+            pos.var,
         );
 
         // Add PI constraint for bid preimage check.
@@ -286,7 +289,12 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             seed,
             latest_consensus_round,
             latest_consensus_step,
-        )?;
+        );
+        let computed_score = match computed_score {
+            Ok(score) => Ok(score),
+            Err(e) => Err(anyhow!(format!("{:?}", e))),
+        }?;
+
         // Constraint the score to be the public one and set it in the PI
         // constructor.
         pi.push(PublicInput::BlsScalar(

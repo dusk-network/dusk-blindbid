@@ -5,7 +5,5 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 pub use bid::Bid;
-use errors::BidGenerationError;
 pub(crate) mod bid;
 pub(crate) mod encoding;
-mod errors;

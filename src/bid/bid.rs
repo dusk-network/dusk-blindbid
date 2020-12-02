@@ -6,26 +6,31 @@
 
 //! Bid data structure
 
-use super::BidGenerationError;
-use anyhow::{Error, Result};
-use dusk_pki::{Ownable, StealthAddress};
-use dusk_plonk::jubjub::{
-    AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
+use crate::errors::BlindBidError;
+#[cfg(feature = "canon")]
+use canonical::{Canon, Store};
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
+use core::borrow::Borrow;
+use dusk_bls12_381::BlsScalar;
+use dusk_jubjub::{
+    JubJubAffine, JubJubScalar, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
-use dusk_plonk::prelude::*;
-use kelvin::{ByteHash, Content, Sink, Source};
-use poseidon252::cipher::{PoseidonCipher, ENCRYPTED_DATA_SIZE};
+use dusk_pki::{Ownable, StealthAddress};
 use poseidon252::sponge::sponge::sponge_hash;
+use poseidon252::{cipher::PoseidonCipher, tree::PoseidonLeaf};
 use rand_core::{CryptoRng, RngCore};
-use std::convert::TryFrom;
+#[cfg(feature = "std")]
 use std::io::{self, Read, Write};
 
 /// Size of a serialized Bid.
 /// The size is computed by adding up the `PoseidonCipher` size +
-/// `StealthAddress` size + 1 `AffinePoint` + 4 `BlsScalar`s.
-pub const BID_SIZE: usize = ENCRYPTED_DATA_SIZE + 64 + 32 * 5;
+/// `StealthAddress` size + 1 `JubJubAffine` + 2 `BlsScalar`s + 3 u64's.
+pub const BID_SIZE: usize =
+    PoseidonCipher::cipher_size_bytes() + 64 + 32 * 3 + 8 * 3;
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
     // b_enc (encrypted value and blinder)
     pub encrypted_data: PoseidonCipher,
@@ -36,11 +41,13 @@ pub struct Bid {
     // m
     pub hashed_secret: BlsScalar,
     // c (Pedersen Commitment)
-    pub c: AffinePoint,
+    pub c: JubJubAffine,
     // Elegibility timestamp
-    pub eligibility: BlsScalar,
+    pub eligibility: u64,
     // Expiration timestamp
-    pub expiration: BlsScalar,
+    pub expiration: u64,
+    // Position of the Bid in the BidTree
+    pub pos: u64,
 }
 
 impl Ownable for Bid {
@@ -49,16 +56,39 @@ impl Ownable for Bid {
     }
 }
 
+impl Borrow<u64> for Bid {
+    fn borrow(&self) -> &u64 {
+        &self.pos
+    }
+}
+
+impl<S> PoseidonLeaf<S> for Bid
+where
+    S: Store,
+{
+    fn poseidon_hash(&self) -> BlsScalar {
+        self.hash()
+    }
+
+    fn pos(&self) -> u64 {
+        self.pos
+    }
+
+    fn set_pos(&mut self, pos: u64) {
+        self.pos = pos;
+    }
+}
+
 impl Bid {
     pub fn new<R>(
         rng: &mut R,
         stealth_address: &StealthAddress,
         value: &JubJubScalar,
-        secret: &AffinePoint,
+        secret: &JubJubAffine,
         secret_k: BlsScalar,
-        eligibility: BlsScalar,
-        expiration: BlsScalar,
-    ) -> Result<Self, Error>
+        eligibility: u64,
+        expiration: u64,
+    ) -> Result<Self, BlindBidError>
     where
         R: RngCore + CryptoRng,
     {
@@ -68,18 +98,16 @@ impl Bid {
             value.reduce() < crate::V_MIN.reduce(),
         ) {
             (true, false) => {
-                return Err(BidGenerationError::MaximumBidValueExceeded {
+                return Err(BlindBidError::MaximumBidValueExceeded {
                     max_val: crate::V_MAX,
                     found: *value,
-                }
-                .into());
+                })?;
             }
             (false, true) => {
-                return Err(BidGenerationError::MinimumBidValueUnreached {
+                return Err(BlindBidError::MinimumBidValueUnreached {
                     min_val: crate::V_MIN,
                     found: *value,
-                }
-                .into());
+                });
             }
             (false, false) => (),
             (_, _) => unreachable!(),
@@ -90,10 +118,11 @@ impl Bid {
             hashed_secret: sponge_hash(&[secret_k]),
             eligibility,
             expiration,
-            c: AffinePoint::default(),
+            c: JubJubAffine::default(),
             stealth_address: *stealth_address,
             encrypted_data: PoseidonCipher::default(),
             nonce: BlsScalar::default(),
+            pos: 0u64,
         };
 
         bid.set_value(rng, value, secret);
@@ -105,7 +134,7 @@ impl Bid {
         &mut self,
         rng: &mut R,
         value: &JubJubScalar,
-        secret: &AffinePoint,
+        secret: &JubJubAffine,
     ) where
         R: RngCore + CryptoRng,
     {
@@ -117,7 +146,7 @@ impl Bid {
             &self.nonce,
         );
 
-        self.c = AffinePoint::from(
+        self.c = JubJubAffine::from(
             &(GENERATOR_EXTENDED * value)
                 + &(GENERATOR_NUMS_EXTENDED * blinder),
         );
@@ -146,8 +175,8 @@ impl Bid {
     /// a tuple containing the value and the blinder
     pub fn decrypt_data(
         &self,
-        secret: &AffinePoint,
-    ) -> Result<(JubJubScalar, JubJubScalar)> {
+        secret: &JubJubAffine,
+    ) -> Result<(JubJubScalar, JubJubScalar), BlindBidError> {
         self.encrypted_data
             .decrypt(secret, &self.nonce)
             .map(|message| {
@@ -162,7 +191,7 @@ impl Bid {
 
                 (value, blinder)
             })
-            .map_err(|_| Error::new(BidGenerationError::WrongSecretProvided))
+            .map_err(|_| BlindBidError::WrongSecretProvided)
     }
 
     // We cannot make this fn const since we need a mut buffer.
@@ -171,14 +200,16 @@ impl Bid {
     /// Given a Bid, return the byte-representation of it.
     pub fn to_bytes(&self) -> [u8; BID_SIZE] {
         let mut buf = [0u8; BID_SIZE];
-        buf[0..ENCRYPTED_DATA_SIZE]
+        buf[0..PoseidonCipher::cipher_size_bytes()]
             .copy_from_slice(&self.encrypted_data.to_bytes());
-        buf[ENCRYPTED_DATA_SIZE..128].copy_from_slice(&self.nonce.to_bytes());
+        buf[PoseidonCipher::cipher_size_bytes()..128]
+            .copy_from_slice(&self.nonce.to_bytes());
         buf[128..192].copy_from_slice(&self.stealth_address.to_bytes());
         buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
         buf[224..256].copy_from_slice(&self.c.to_bytes());
-        buf[256..288].copy_from_slice(&self.eligibility.to_bytes());
-        buf[288..320].copy_from_slice(&self.expiration.to_bytes());
+        buf[256..264].copy_from_slice(&self.eligibility.to_le_bytes());
+        buf[264..272].copy_from_slice(&self.expiration.to_le_bytes());
+        buf[272..BID_SIZE].copy_from_slice(&self.pos.to_le_bytes());
         buf
     }
 
@@ -186,22 +217,26 @@ impl Bid {
     // mutable references in const fn are unstable
     // see issue #57563 <https://github.com/rust-lang/rust/issues/57563>
     /// Given the byte-representation of a `Bid`, generate one instance of it.
-    pub fn from_bytes(bytes: [u8; BID_SIZE]) -> io::Result<Bid> {
-        let mut one_cipher = [0u8; ENCRYPTED_DATA_SIZE];
+    pub fn from_bytes(bytes: [u8; BID_SIZE]) -> Result<Bid, BlindBidError> {
+        let mut one_cipher = [0u8; PoseidonCipher::cipher_size_bytes()];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
+        let mut one_u64 = [0u8; 8];
 
-        one_cipher[..].copy_from_slice(&bytes[0..ENCRYPTED_DATA_SIZE]);
-        let encrypted_data =
-            PoseidonCipher::from_bytes(&one_cipher).ok_or(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Could not recover PoseidonCipher from bytes"),
-            ))?;
-        one_scalar[..].copy_from_slice(&bytes[ENCRYPTED_DATA_SIZE..128]);
+        one_cipher[..]
+            .copy_from_slice(&bytes[0..PoseidonCipher::cipher_size_bytes()]);
+        let encrypted_data = PoseidonCipher::from_bytes(&one_cipher)
+            .ok_or(BlindBidError::IOError)?;
+        one_scalar[..]
+            .copy_from_slice(&bytes[PoseidonCipher::cipher_size_bytes()..128]);
         let nonce = read_scalar(&one_scalar)?;
 
         one_stealth_address[..].copy_from_slice(&bytes[128..192]);
-        let stealth_address = StealthAddress::from_bytes(&one_stealth_address)?;
+        let stealth_address = StealthAddress::from_bytes(&one_stealth_address);
+        let stealth_address = match stealth_address {
+            Ok(address) => Ok(address),
+            Err(_) => Err(BlindBidError::IOError),
+        }?;
 
         one_scalar[..].copy_from_slice(&bytes[192..224]);
         let hashed_secret = read_scalar(&one_scalar)?;
@@ -209,11 +244,14 @@ impl Bid {
         one_scalar[..].copy_from_slice(&bytes[224..256]);
         let c = read_jubjub_affine(&one_scalar)?;
 
-        one_scalar[..].copy_from_slice(&bytes[256..288]);
-        let eligibility = read_scalar(&one_scalar)?;
+        one_u64[..].copy_from_slice(&bytes[256..264]);
+        let eligibility = u64::from_le_bytes(one_u64);
 
-        one_scalar[..].copy_from_slice(&bytes[288..320]);
-        let expiration = read_scalar(&one_scalar)?;
+        one_u64[..].copy_from_slice(&bytes[264..272]);
+        let expiration = u64::from_le_bytes(one_u64);
+
+        one_u64[..].copy_from_slice(&bytes[272..BID_SIZE]);
+        let pos = u64::from_le_bytes(one_u64);
 
         Ok(Bid {
             encrypted_data,
@@ -223,11 +261,12 @@ impl Bid {
             c,
             eligibility,
             expiration,
+            pos,
         })
     }
 
     /// Check if the bid is eligible for the provided block height
-    pub fn eligible(&self, block_height: &BlsScalar) -> bool {
+    pub fn eligible(&self, block_height: &u64) -> bool {
         &self.eligibility <= block_height && block_height <= &self.expiration
     }
 }
@@ -240,6 +279,7 @@ impl PartialEq for Bid {
 
 impl Eq for Bid {}
 
+#[cfg(feature = "std")]
 impl Read for Bid {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut buf = io::BufWriter::new(&mut buf[..]);
@@ -250,30 +290,34 @@ impl Read for Bid {
         n += buf.write(&self.stealth_address.to_bytes())?;
         n += buf.write(&self.hashed_secret.to_bytes())?;
         n += buf.write(&self.c.to_bytes())?;
-        n += buf.write(&self.eligibility.to_bytes())?;
-        n += buf.write(&self.expiration.to_bytes())?;
+        n += buf.write(&self.eligibility.to_le_bytes())?;
+        n += buf.write(&self.expiration.to_le_bytes())?;
+        n += buf.write(&self.pos.to_le_bytes())?;
 
         buf.flush()?;
         Ok(n)
     }
 }
 
-fn read_scalar(one_scalar: &[u8; 32]) -> io::Result<BlsScalar> {
+fn read_scalar(one_scalar: &[u8; 32]) -> Result<BlsScalar, BlindBidError> {
     let possible_scalar = BlsScalar::from_bytes(&one_scalar);
     if possible_scalar.is_none().into() {
-        return Err(io::ErrorKind::InvalidData)?;
+        return Err(BlindBidError::IOError);
     };
     Ok(possible_scalar.unwrap())
 }
 
-fn read_jubjub_affine(one_point: &[u8; 32]) -> io::Result<AffinePoint> {
-    let possible_scalar = AffinePoint::from_bytes(*one_point);
+fn read_jubjub_affine(
+    one_point: &[u8; 32],
+) -> Result<JubJubAffine, BlindBidError> {
+    let possible_scalar = JubJubAffine::from_bytes(*one_point);
     if possible_scalar.is_none().into() {
-        return Err(io::ErrorKind::InvalidData)?;
+        return Err(BlindBidError::IOError);
     };
     Ok(possible_scalar.unwrap())
 }
 
+#[cfg(feature = "std")]
 impl Write for Bid {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let mut buf = io::BufReader::new(&buf[..]);
@@ -281,6 +325,7 @@ impl Write for Bid {
         let mut one_cipher = [0u8; 96];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
+        let mut one_u64 = [0u8; 8];
 
         let mut n = 0;
 
@@ -299,7 +344,13 @@ impl Write for Bid {
         buf.read_exact(&mut one_stealth_address)?;
         n += one_stealth_address.len();
         self.stealth_address =
-            StealthAddress::from_bytes(&one_stealth_address)?;
+            match StealthAddress::from_bytes(&one_stealth_address) {
+                Ok(address) => Ok(address),
+                Err(e) => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("{:?}", e),
+                )),
+            }?;
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
@@ -311,69 +362,19 @@ impl Write for Bid {
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.eligibility = read_scalar(&one_scalar)?;
+        self.eligibility = u64::from_le_bytes(one_u64);
 
         buf.read_exact(&mut one_scalar)?;
         n += one_scalar.len();
-        self.expiration = read_scalar(&one_scalar)?;
+        self.expiration = u64::from_le_bytes(one_u64);
+
+        buf.read_exact(&mut one_u64)?;
+        n += one_u64.len();
+        self.pos = u64::from_le_bytes(one_u64);
         Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
-    }
-}
-
-impl<H: ByteHash> Content<H> for Bid {
-    fn persist(&mut self, sink: &mut Sink<H>) -> io::Result<()> {
-        sink.write_all(&self.encrypted_data.to_bytes())?;
-        sink.write_all(&self.nonce.to_bytes())?;
-        sink.write_all(&self.stealth_address.to_bytes())?;
-        sink.write_all(&self.hashed_secret.to_bytes())?;
-        sink.write_all(&self.c.to_bytes())?;
-        sink.write_all(&self.eligibility.to_bytes())?;
-        sink.write_all(&self.expiration.to_bytes())?;
-        Ok(())
-    }
-
-    fn restore(source: &mut Source<H>) -> io::Result<Self> {
-        let mut one_scalar = [0u8; 32];
-        let mut one_stealth_address = [0u8; 64];
-
-        let mut encrypted_data_cipher = [0u8; ENCRYPTED_DATA_SIZE];
-        source.read_exact(&mut encrypted_data_cipher)?;
-        let encrypted_data = PoseidonCipher::from_bytes(&encrypted_data_cipher)
-            .ok_or(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Could not recover PoseidonCipher from bytes"),
-            ))?;
-
-        source.read_exact(&mut one_scalar)?;
-        let nonce = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_stealth_address)?;
-        let stealth_address = StealthAddress::try_from(&one_stealth_address)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let hashed_secret = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let commitment = read_jubjub_affine(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let eligibility = read_scalar(&one_scalar)?;
-
-        source.read_exact(&mut one_scalar)?;
-        let expiration = read_scalar(&one_scalar)?;
-
-        Ok(Bid {
-            encrypted_data,
-            nonce,
-            stealth_address,
-            hashed_secret,
-            c: commitment,
-            eligibility,
-            expiration,
-        })
     }
 }

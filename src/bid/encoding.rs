@@ -9,9 +9,12 @@
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
+use dusk_bls12_381::BlsScalar;
+#[cfg(feature = "std")]
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
+#[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-use poseidon252::{sponge::sponge::*, StorageScalar};
+use poseidon252::sponge::{hash as sponge_hash, sponge::sponge_hash_gadget};
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -19,64 +22,77 @@ use poseidon252::{sponge::sponge::*, StorageScalar};
 // Type 3 will be JubJubAffine coordinates tuple
 // Type 4 will be u32
 // Type 5 will be PoseidonCipher
+// Type 6 will be u64
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different
 // structures
-const TYPE_FIELDS: [u8; 32] = *b"53313110000000000000000000000000";
+const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
 
 impl Bid {
-    /// Calculate the one-way BlsScalar representation of the Bid
-    pub fn hash(&self) -> BlsScalar {
+    /// Return the Bid as a set of "hasheable" parameters which is directly
+    /// digestible by the Poseidon sponge hash fn.
+    pub fn as_hash_inputs(&self) -> [BlsScalar; 13] {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
-        let mut words_deposit = Vec::new();
+        let mut words_deposit = [BlsScalar::zero(); 13];
         // Note that the merkle_tree_root is not used since we can't pre-compute
         // it. Therefore, any field that relies on it to be computed isn't
         // neither used to obtain this encoded form.
 
         // Safe unwrap here.
         let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
-        words_deposit.push(type_fields);
+        words_deposit[0] = type_fields;
 
         // 2. Encode each word.
         // Push cipher as scalars.
-        words_deposit.push(self.encrypted_data.cipher()[0]);
-        words_deposit.push(self.encrypted_data.cipher()[1]);
+        words_deposit[1] = self.encrypted_data.cipher()[0];
+        words_deposit[2] = self.encrypted_data.cipher()[1];
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.extend_from_slice(
-            self.stealth_address.pk_r().to_hash_inputs().as_ref(),
-        );
+        {
+            let tmp = self.stealth_address.pk_r().to_hash_inputs();
+            words_deposit[3] = tmp[0];
+            words_deposit[4] = tmp[1];
+        }
+        // Push both JubJubAffine coordinates as a Scalar.
+        {
+            let tmp = self.stealth_address.R().to_hash_inputs();
+            words_deposit[5] = tmp[0];
+            words_deposit[6] = tmp[1];
+        }
+
+        words_deposit[7] = self.hashed_secret;
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.extend_from_slice(
-            self.stealth_address.R().to_hash_inputs().as_ref(),
-        );
-
-        words_deposit.push(self.hashed_secret);
-
-        // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.c.get_x());
-        words_deposit.push(self.c.get_y());
+        words_deposit[8] = self.c.get_x();
+        words_deposit[9] = self.c.get_y();
         // Push the timestamps of the Bid
-        words_deposit.push(self.eligibility);
-        words_deposit.push(self.expiration);
+        words_deposit[10] = BlsScalar::from(self.eligibility);
+        words_deposit[11] = BlsScalar::from(self.expiration);
+        words_deposit[12] = BlsScalar::from(self.pos);
 
+        words_deposit
+    }
+
+    /// Calculate the one-way BlsScalar representation of the Bid
+    pub fn hash(&self) -> BlsScalar {
+        // Set the Bid parameters on a "hasheable" way to be digested
+        // by the poseidon sponge hash.
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
-        sponge_hash(&words_deposit)
+        sponge_hash(&self.as_hash_inputs())
     }
 }
 
-impl Into<StorageScalar> for &Bid {
-    fn into(self) -> StorageScalar {
-        StorageScalar(self.hash())
+impl Into<BlsScalar> for &Bid {
+    fn into(self) -> BlsScalar {
+        self.hash()
     }
 }
 
-impl Into<StorageScalar> for Bid {
-    fn into(self) -> StorageScalar {
+impl Into<BlsScalar> for Bid {
+    fn into(self) -> BlsScalar {
         (&self).into()
     }
 }
@@ -84,6 +100,8 @@ impl Into<StorageScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon252 hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
+#[allow(dead_code)]
+#[cfg(feature = "std")]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.
@@ -96,6 +114,7 @@ pub(crate) fn preimage_gadget(
     hashed_secret: Variable,
     eligibility: Variable,
     expiration: Variable,
+    pos: Variable,
 ) -> Variable {
     // This field represents the types of the inputs and has to be the same
     // as the default one.
@@ -123,11 +142,14 @@ pub(crate) fn preimage_gadget(
     // Add elebility & expiration timestamps.
     messages.push(eligibility);
     messages.push(expiration);
+    // Add position of the bid in the BidTree
+    messages.push(pos);
 
     // Perform the sponge_hash inside of the Constraint System
     sponge_hash_gadget(composer, &messages)
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,7 +160,7 @@ mod tests {
     use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
-    fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
+    fn random_bid(secret: &JubJubScalar) -> Bid {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::from(*secret);
@@ -149,8 +171,8 @@ mod tests {
             .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
-        let eligibility = -BlsScalar::one();
-        let expiration = -BlsScalar::one();
+        let eligibility = u64::MAX;
+        let expiration = u64::MAX;
 
         Bid::new(
             &mut rng,
@@ -161,6 +183,7 @@ mod tests {
             eligibility,
             expiration,
         )
+        .expect("Bid creation error")
     }
 
     #[ignore]
@@ -179,7 +202,7 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret)?;
+        let bid = random_bid(&secret);
 
         let circuit = |composer: &mut StandardComposer, bid: &Bid| {
             // Allocate Bid-internal fields
@@ -200,10 +223,16 @@ mod tests {
                     bid.stealth_address.R().into(),
                 ),
             );
-            let eligibility =
-                AllocatedScalar::allocate(composer, bid.eligibility);
-            let expiration =
-                AllocatedScalar::allocate(composer, bid.expiration);
+            let eligibility = AllocatedScalar::allocate(
+                composer,
+                BlsScalar::from(bid.eligibility),
+            );
+            let expiration = AllocatedScalar::allocate(
+                composer,
+                BlsScalar::from(bid.expiration),
+            );
+            let pos =
+                AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
             let bid_hash = preimage_gadget(
                 composer,
                 bid_cipher,
@@ -212,14 +241,15 @@ mod tests {
                 bid_hashed_secret.var,
                 eligibility.var,
                 expiration.var,
+                pos.var,
             );
 
             // Constraint the hash to be equal to the real one
-            let storage_bid: StorageScalar = bid.into();
+            let storage_bid = bid.hash();
             composer.constrain_to_constant(
                 bid_hash,
                 BlsScalar::zero(),
-                -storage_bid.0,
+                -storage_bid,
             );
         };
         // Proving
