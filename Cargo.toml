@@ -12,7 +12,7 @@ dusk-jubjub = {version = "0.5", default-features = false}
 dusk-plonk = {version = "0.3", features = ["trace-print"], optional = true}
 num-bigint = {version = "0.3", optional = true } 
 num-traits = {version = "0.2", optional = true } 
-plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.3"}
+plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.3", optional = true}
 rand_core = {version = "0.5", default-features = false}  
 lazy_static = "1.4.0"
 rand = {version = "0.7", default-features = false, optional = true }
@@ -41,6 +41,5 @@ canon = [
     "canonical_derive",
     "poseidon252/canon",
     "dusk-pki/canon",
-    "dusk-plonk/canon"
 ]
 
