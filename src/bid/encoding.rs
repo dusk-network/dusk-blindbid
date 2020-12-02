@@ -14,7 +14,7 @@ use dusk_bls12_381::BlsScalar;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 #[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-use poseidon252::sponge::sponge::*;
+use poseidon252::sponge::{hash as sponge_hash, sponge::sponge_hash_gadget};
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -29,8 +29,9 @@ use poseidon252::sponge::sponge::*;
 const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
 
 impl Bid {
-    /// Calculate the one-way BlsScalar representation of the Bid
-    pub fn hash(&self) -> BlsScalar {
+    /// Return the Bid as a set of "hasheable" parameters which is directly
+    /// digestible by the Poseidon sponge hash fn.
+    pub fn to_hash_inputs(&self) -> [BlsScalar; 13] {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
         let mut words_deposit = [BlsScalar::zero(); 13];
@@ -70,10 +71,17 @@ impl Bid {
         words_deposit[11] = BlsScalar::from(self.expiration);
         words_deposit[12] = BlsScalar::from(self.pos);
 
+        words_deposit
+    }
+
+    /// Calculate the one-way BlsScalar representation of the Bid
+    pub fn hash(&self) -> BlsScalar {
+        // Set the Bid parameters on a "hasheable" way to be digested
+        // by the poseidon sponge hash.
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
-        sponge_hash(&words_deposit)
+        sponge_hash(&self.to_hash_inputs())
     }
 }
 

@@ -5,8 +5,6 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! BlindBidProof module.
-#![cfg(feature = "canon")]
-
 use crate::bid::{encoding::preimage_gadget, Bid};
 use crate::score_gen::{score::prove_correct_score_gadget, Score};
 use anyhow::{anyhow, Result};
@@ -18,7 +16,7 @@ use dusk_plonk::constraint_system::ecc::{
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
-    sponge::sponge::*,
+    sponge::sponge::sponge_hash_gadget,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 

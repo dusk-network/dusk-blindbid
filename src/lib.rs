@@ -13,7 +13,7 @@ pub mod errors;
 #[cfg(feature = "std")]
 pub mod proof;
 pub mod score_gen;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "canon"))]
 pub use proof::BlindBidCircuit;
 
 pub const V_RAW_MIN: u64 = 50_000u64;

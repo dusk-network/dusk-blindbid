@@ -26,7 +26,7 @@ use num_traits::{One, Zero};
 use plonk_gadgets::{
     AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
-use poseidon252::sponge::*;
+use poseidon252::sponge::{hash as sponge_hash, sponge::sponge_hash_gadget};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "canon", derive(Canon))]
@@ -78,7 +78,7 @@ impl Bid {
 
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
         // latest_consensus_round, latest_consensus_step)`.
-        let y = sponge::sponge_hash(&[
+        let y = sponge_hash(&[
             secret_k,
             bid_tree_root,
             consensus_round_seed,
@@ -146,7 +146,7 @@ pub fn prove_correct_score_gadget(
     let two_pow_128 = BlsScalar::from(2u64).pow(&[128, 0, 0, 0]);
 
     // 1. y = H(k||H(Bi)||sigma^s||k^t||k^s)
-    let should_be_y = sponge::sponge_hash_gadget(
+    let should_be_y = sponge_hash_gadget(
         composer,
         &[
             secret_k.var,
