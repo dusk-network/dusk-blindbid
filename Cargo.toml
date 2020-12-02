@@ -5,24 +5,37 @@ authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.0"
-dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.3.0"}
-poseidon252 = {git = "https://github.com/dusk-network/poseidon252", tag = "v0.13.1"}
-dusk-plonk = {version = "0.3.3", features = ["trace-print"]}
-num-bigint = "0.3.0"
-num-traits = "0.2.11"
-plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.2"}
-thiserror = "1.0.20"
-rand_core = "0.5.1"
+dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.4.1", default-features = false}
+poseidon252 = {git = "https://github.com/dusk-network/poseidon252", tag = "v0.14.1", default-features = false}
+dusk-bls12_381 = {version = "0.3", default-features = false}
+dusk-jubjub = {version = "0.5", default-features = false}
+dusk-plonk = {version = "0.3", features = ["trace-print"], optional = true}
+num-bigint = {version = "0.3", optional = true } 
+num-traits = {version = "0.2", optional = true } 
+plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.3"}
+rand_core = {version = "0.5", default-features = false}  
 lazy_static = "1.4.0"
-rand = "0.7"
-canonical = { version = "^0.4", optional = true }
-canonical_derive = { version = "^0.4", optional = true }
+rand = {version = "0.7", default-features = false }
+canonical = { version = "0.4", optional = true }
+canonical_derive = { version = "0.4", optional = true }
+anyhow = {version = "1", optional = true}
 
 [dev-dependencies]
-canonical_host = "^0.4"
+canonical_host = "0.4"
 
 [features]
+default = ["std", "canon"]
+std = [
+    "anyhow",
+    "dusk-jubjub/std",
+    "dusk-bls12_381/std",
+    "poseidon252/default",
+    "dusk-plonk",
+    "num-bigint",
+    "num-traits",
+    "rand/default",
+    "rand_core/std",
+]
 canon = [
     "canonical",
     "canonical_derive",
@@ -30,5 +43,4 @@ canon = [
     "dusk-pki/canon",
     "dusk-plonk/canon"
 ]
-canon_host = ["canon", "canonical/host"]
 

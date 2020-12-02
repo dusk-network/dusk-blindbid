@@ -9,7 +9,10 @@
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
+use dusk_bls12_381::BlsScalar;
+#[cfg(feature = "std")]
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
+#[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
 use poseidon252::sponge::sponge::*;
 
@@ -30,39 +33,42 @@ impl Bid {
     pub fn hash(&self) -> BlsScalar {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
-        let mut words_deposit = Vec::new();
+        let mut words_deposit = [BlsScalar::zero(); 13];
         // Note that the merkle_tree_root is not used since we can't pre-compute
         // it. Therefore, any field that relies on it to be computed isn't
         // neither used to obtain this encoded form.
 
         // Safe unwrap here.
         let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
-        words_deposit.push(type_fields);
+        words_deposit[0] = type_fields;
 
         // 2. Encode each word.
         // Push cipher as scalars.
-        words_deposit.push(self.encrypted_data.cipher()[0]);
-        words_deposit.push(self.encrypted_data.cipher()[1]);
+        words_deposit[1] = self.encrypted_data.cipher()[0];
+        words_deposit[2] = self.encrypted_data.cipher()[1];
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.extend_from_slice(
-            self.stealth_address.pk_r().to_hash_inputs().as_ref(),
-        );
+        {
+            let tmp = self.stealth_address.pk_r().to_hash_inputs();
+            words_deposit[3] = tmp[0];
+            words_deposit[4] = tmp[1];
+        }
+        // Push both JubJubAffine coordinates as a Scalar.
+        {
+            let tmp = self.stealth_address.R().to_hash_inputs();
+            words_deposit[5] = tmp[0];
+            words_deposit[6] = tmp[1];
+        }
+
+        words_deposit[7] = self.hashed_secret;
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.extend_from_slice(
-            self.stealth_address.R().to_hash_inputs().as_ref(),
-        );
-
-        words_deposit.push(self.hashed_secret);
-
-        // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit.push(self.c.get_x());
-        words_deposit.push(self.c.get_y());
+        words_deposit[8] = self.c.get_x();
+        words_deposit[9] = self.c.get_y();
         // Push the timestamps of the Bid
-        words_deposit.push(BlsScalar::from(self.eligibility));
-        words_deposit.push(BlsScalar::from(self.expiration));
-        words_deposit.push(BlsScalar::from(self.pos));
+        words_deposit[10] = BlsScalar::from(self.eligibility);
+        words_deposit[11] = BlsScalar::from(self.expiration);
+        words_deposit[12] = BlsScalar::from(self.pos);
 
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
@@ -87,6 +93,7 @@ impl Into<BlsScalar> for Bid {
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
 #[allow(dead_code)]
+#[cfg(feature = "std")]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.
@@ -134,6 +141,7 @@ pub(crate) fn preimage_gadget(
     sponge_hash_gadget(composer, &messages)
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,7 +152,7 @@ mod tests {
     use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
-    fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
+    fn random_bid(secret: &JubJubScalar) -> Bid {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::from(*secret);
@@ -167,6 +175,7 @@ mod tests {
             eligibility,
             expiration,
         )
+        .expect("Bid creation error")
     }
 
     #[ignore]
@@ -185,7 +194,7 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret)?;
+        let bid = random_bid(&secret);
 
         let circuit = |composer: &mut StandardComposer, bid: &Bid| {
             // Allocate Bid-internal fields

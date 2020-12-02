@@ -6,17 +6,22 @@
 
 //! Score generation
 
-use super::errors::ScoreError;
 use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
 use crate::bid::Bid;
-use anyhow::{Error, Result};
+use crate::errors::BlindBidError;
+#[cfg(feature = "std")]
+use anyhow::{Error as AnyhowError, Result};
 #[cfg(feature = "canon")]
 use canonical::Canon;
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
-use dusk_plonk::jubjub::AffinePoint as JubJubAffine;
+use dusk_bls12_381::BlsScalar;
+use dusk_jubjub::JubJubAffine;
+#[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
+#[cfg(feature = "std")]
 use num_bigint::BigUint;
+#[cfg(feature = "std")]
 use num_traits::{One, Zero};
 use plonk_gadgets::{
     AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
@@ -51,6 +56,7 @@ impl Score {
     }
 }
 
+#[cfg(feature = "std")]
 impl Bid {
     /// Given a `Bid`, compute it's Score and return it.
     pub fn compute_score(
@@ -61,9 +67,9 @@ impl Bid {
         consensus_round_seed: u64,
         latest_consensus_round: u64,
         latest_consensus_step: u64,
-    ) -> Result<Score, Error> {
+    ) -> Result<Score, BlindBidError> {
         if latest_consensus_round > self.expiration {
-            return Err(ScoreError::ExpiredBid.into());
+            return Err(BlindBidError::ExpiredBid);
         };
 
         let consensus_round_seed = BlsScalar::from(consensus_round_seed);
@@ -115,6 +121,7 @@ impl Bid {
     }
 }
 
+#[cfg(feature = "std")]
 /// Proves that a `Score` is correctly generated.
 /// Prints the proving statements in the passed Constraint System.
 pub fn prove_correct_score_gadget(
@@ -126,7 +133,7 @@ pub fn prove_correct_score_gadget(
     consensus_round_seed: AllocatedScalar,
     latest_consensus_round: AllocatedScalar,
     latest_consensus_step: AllocatedScalar,
-) -> Result<Variable, Error> {
+) -> Result<Variable, AnyhowError> {
     // Allocate constant one & zero values.
     let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -288,26 +295,29 @@ pub fn prove_correct_score_gadget(
     Ok(score_alloc_scalar.var)
 }
 
-// Given the y parameter, return the y' and it's inverse value.
-fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, Error> {
+#[cfg(feature = "std")]
+/// Given the y parameter, return the y' and it's inverse value.
+fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     let mut bytes = [0u8; 32];
     let biguint_bytes = biguint.to_bytes_le();
     if biguint_bytes.len() > 32 {
-        return Err(ScoreError::InvalidScoreFieldsLen.into());
+        return Err(BlindBidError::InvalidScoreFieldsLen);
     };
     bytes[..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
     // Due to the previous conditions, we can unwrap here safely.
     Ok(BlsScalar::from_bytes(&bytes).unwrap())
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{Error, Result};
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use rand::Rng;
 
-    fn random_bid(secret: &JubJubScalar) -> Result<Bid, Error> {
+    fn random_bid(secret: &JubJubScalar) -> Bid {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
@@ -329,6 +339,7 @@ mod tests {
             eligibility,
             expiration,
         )
+        .expect("Bid creation error")
     }
 
     #[test]
@@ -376,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_score_gen_proof() -> Result<(), Error> {
+    fn correct_score_gen_proof() -> Result<(), AnyhowError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -384,9 +395,10 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret)?;
+        let bid = random_bid(&secret);
         let secret = GENERATOR_EXTENDED * &secret;
-        let (value, _) = bid.decrypt_data(&secret.into())?;
+        let (value, _) =
+            bid.decrypt_data(&secret.into()).expect("Decryption error");
 
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
@@ -399,14 +411,16 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let score = bid.compute_score(
-            &secret.into(),
-            secret_k,
-            bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )?;
+        let score = bid
+            .compute_score(
+                &secret.into(),
+                secret_k,
+                bid_tree_root,
+                consensus_round_seed,
+                latest_consensus_round,
+                latest_consensus_step,
+            )
+            .expect("Score computation error");
 
         // Proving
         let mut prover = Prover::new(b"testing");
@@ -474,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn incorrect_score_gen_proof() -> Result<(), Error> {
+    fn incorrect_score_gen_proof() -> Result<(), AnyhowError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -482,9 +496,10 @@ mod tests {
 
         // Generate a correct Bid
         let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret)?;
+        let bid = random_bid(&secret);
         let secret = GENERATOR_EXTENDED * &secret;
-        let (value, _) = bid.decrypt_data(&secret.into())?;
+        let (value, _) =
+            bid.decrypt_data(&secret.into()).expect("Decryption Error");
 
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
@@ -497,14 +512,16 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let mut score = bid.compute_score(
-            &secret.into(),
-            secret_k,
-            bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )?;
+        let mut score = bid
+            .compute_score(
+                &secret.into(),
+                secret_k,
+                bid_tree_root,
+                consensus_round_seed,
+                latest_consensus_round,
+                latest_consensus_step,
+            )
+            .expect("Score Computation error");
         score.score = BlsScalar::from(5686536568u64);
         score.r1 = BlsScalar::from(5898956968u64);
 

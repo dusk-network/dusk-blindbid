@@ -5,10 +5,8 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! Score generation module
-mod errors;
 pub mod score;
-use dusk_plonk::bls12_381::Scalar as BlsScalar;
-pub use errors::ScoreError;
+use dusk_bls12_381::BlsScalar;
 pub use score::Score;
 
 pub(crate) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =

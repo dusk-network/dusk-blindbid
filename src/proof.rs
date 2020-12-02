@@ -9,18 +9,17 @@
 
 use crate::bid::{encoding::preimage_gadget, Bid};
 use crate::score_gen::{score::prove_correct_score_gadget, Score};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use dusk_bls12_381::BlsScalar;
+use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,
-};
-use dusk_plonk::jubjub::{
-    AffinePoint, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
     sponge::sponge::*,
-    tree::{zk::merkle_opening as merkle_opening_gadget, PoseidonBranch},
+    tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 
 #[derive(Debug, Clone)]
@@ -35,7 +34,7 @@ pub struct BlindBidCircuit<'a> {
     pub latest_consensus_step: BlsScalar,
     pub branch: &'a PoseidonBranch<17>,
     // Required fields to decrypt Bid internal info.
-    pub secret: AffinePoint,
+    pub secret: JubJubAffine,
     pub trim_size: usize,
     pub pi_positions: Vec<PublicInput>,
 }
@@ -292,7 +291,12 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             seed,
             latest_consensus_round,
             latest_consensus_step,
-        )?;
+        );
+        let computed_score = match computed_score {
+            Ok(score) => Ok(score),
+            Err(e) => Err(anyhow!(format!("{:?}", e))),
+        }?;
+
         // Constraint the score to be the public one and set it in the PI
         // constructor.
         pi.push(PublicInput::BlsScalar(
