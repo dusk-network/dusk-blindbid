@@ -31,7 +31,7 @@ const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
 impl Bid {
     /// Return the Bid as a set of "hasheable" parameters which is directly
     /// digestible by the Poseidon sponge hash fn.
-    pub fn to_hash_inputs(&self) -> [BlsScalar; 13] {
+    pub fn as_hash_inputs(&self) -> [BlsScalar; 13] {
         // Generate an empty vector of `Scalar` which will store the
         // representation of all of the `Bid` elements.
         let mut words_deposit = [BlsScalar::zero(); 13];
@@ -81,7 +81,7 @@ impl Bid {
         // Once all of the words are translated as `Scalar` and stored
         // correctly, apply the Poseidon sponge hash function to obtain
         // the encoded form of the `Bid`.
-        sponge_hash(&self.to_hash_inputs())
+        sponge_hash(&self.as_hash_inputs())
     }
 }
 

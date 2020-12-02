@@ -29,7 +29,7 @@ std = [
     "anyhow",
     "dusk-jubjub/std",
     "dusk-bls12_381/std",
-    "dusk-plonk/default"
+    "dusk-plonk",
     "poseidon252/default",
     "plonk_gadgets",
     "num-bigint",
