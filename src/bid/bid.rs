@@ -8,7 +8,9 @@
 
 use crate::errors::BlindBidError;
 #[cfg(feature = "canon")]
-use canonical::{Canon, Store};
+use canonical::Canon;
+#[cfg(all(feature = "canon", feature = "std"))]
+use canonical::Store;
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
 use core::borrow::Borrow;
@@ -17,8 +19,10 @@ use dusk_jubjub::{
     JubJubAffine, JubJubScalar, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_pki::{Ownable, StealthAddress};
+use poseidon252::cipher::PoseidonCipher;
 use poseidon252::sponge::sponge::sponge_hash;
-use poseidon252::{cipher::PoseidonCipher, tree::PoseidonLeaf};
+#[cfg(feature = "std")]
+use poseidon252::tree::PoseidonLeaf;
 use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "std")]
 use std::io::{self, Read, Write};
@@ -56,6 +60,7 @@ impl Borrow<u64> for Bid {
     }
 }
 
+#[cfg(all(feature = "canon", feature = "std"))]
 impl<S> PoseidonLeaf<S> for Bid
 where
     S: Store,

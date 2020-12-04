@@ -7,7 +7,7 @@
 #![allow(non_snake_case)]
 #![cfg(feature = "canon")]
 #![cfg(feature = "std")]
-use anyhow::{Error, Result};
+use anyhow::Result;
 use canonical::Store;
 use canonical_host::MemStore;
 use dusk_blindbid::proof::BlindBidCircuit;
@@ -15,10 +15,7 @@ use dusk_blindbid::{bid::Bid, score_gen::Score};
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
-use poseidon252::tree::{
-    PoseidonBranch, PoseidonLeaf, PoseidonMaxAnnotation, PoseidonTree,
-    PoseidonTreeIterator,
-};
+use poseidon252::tree::{PoseidonBranch, PoseidonMaxAnnotation, PoseidonTree};
 use rand::Rng;
 
 const V_RAW_MIN: u64 = 50_000u64;
@@ -39,6 +36,7 @@ where
     ///
     /// We don't have a mutable reference available because all its mutation
     /// should be protected by encapsulation
+    #[allow(dead_code)]
     pub fn inner(
         &self,
     ) -> &PoseidonTree<Bid, PoseidonMaxAnnotation, S, 17usize> {
@@ -46,6 +44,7 @@ where
     }
 
     /// Get a bid from a provided index
+    #[allow(dead_code)]
     pub fn get(&self, idx: u64) -> Option<Bid> {
         self.0.get(idx as usize).unwrap()
     }
