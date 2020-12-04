@@ -5,21 +5,37 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! Score generation module
-pub mod score;
+pub(crate) mod score;
+#[cfg(feature = "canon")]
+use canonical::Canon;
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
 use dusk_bls12_381::BlsScalar;
-pub use score::Score;
 
-pub(crate) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
-    BlsScalar::from_raw([
-        0x3339d80809a1d805,
-        0x73eda753299d7d48,
-        0x0000000000000000,
-        0x0000000000000000,
-    ]);
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "canon", derive(Canon))]
+pub struct Score {
+    pub score: BlsScalar,
+    pub(crate) y: BlsScalar,
+    pub(crate) y_prime: BlsScalar,
+    pub(crate) r1: BlsScalar,
+    pub(crate) r2: BlsScalar,
+}
 
-pub(crate) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
-    0xffffffff00000000,
-    0x53bda402fffe5bfe,
-    0x0000000000000000,
-    0x0000000000000000,
-]);
+impl Score {
+    pub(crate) fn new(
+        score: BlsScalar,
+        y: BlsScalar,
+        y_prime: BlsScalar,
+        r1: BlsScalar,
+        r2: BlsScalar,
+    ) -> Self {
+        Score {
+            score,
+            y,
+            y_prime,
+            r1,
+            r2,
+        }
+    }
+}

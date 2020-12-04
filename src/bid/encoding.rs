@@ -4,8 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//!BlsScalar Encoding module for Bid structure.
-//!
+//! Encoding module for Bid structure.
 //! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
 
 use super::Bid;
@@ -14,7 +13,9 @@ use dusk_bls12_381::BlsScalar;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 #[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-use poseidon252::sponge::{hash as sponge_hash, sponge::sponge_hash_gadget};
+use poseidon252::sponge::hash as sponge_hash;
+#[cfg(feature = "std")]
+use poseidon252::sponge::sponge::sponge_hash_gadget;
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -153,7 +154,7 @@ pub(crate) fn preimage_gadget(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Error, Result};
+    use anyhow::Result;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::constraint_system::ecc::Point;
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;

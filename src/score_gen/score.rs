@@ -5,58 +5,38 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! Score generation
+#![cfg(feature = "std")]
 
-use super::{MINUS_ONE_MOD_2_POW_128, SCALAR_FIELD_ORD_DIV_2_POW_128};
+use super::Score;
 use crate::bid::Bid;
 use crate::errors::BlindBidError;
-#[cfg(feature = "std")]
 use anyhow::{Error as AnyhowError, Result};
-#[cfg(feature = "canon")]
-use canonical::Canon;
-#[cfg(feature = "canon")]
-use canonical_derive::Canon;
 use dusk_bls12_381::BlsScalar;
 use dusk_jubjub::JubJubAffine;
-#[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-#[cfg(feature = "std")]
 use num_bigint::BigUint;
-#[cfg(feature = "std")]
 use num_traits::{One, Zero};
 use plonk_gadgets::{
     AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
-use poseidon252::sponge::{hash as sponge_hash, sponge::sponge_hash_gadget};
+use poseidon252::sponge::hash as sponge_hash;
+use poseidon252::sponge::sponge::sponge_hash_gadget;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
-#[cfg_attr(feature = "canon", derive(Canon))]
-pub struct Score {
-    pub score: BlsScalar,
-    pub(crate) y: BlsScalar,
-    pub(crate) y_prime: BlsScalar,
-    pub(crate) r1: BlsScalar,
-    pub(crate) r2: BlsScalar,
-}
+pub(self) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
+    BlsScalar::from_raw([
+        0x3339d80809a1d805,
+        0x73eda753299d7d48,
+        0x0000000000000000,
+        0x0000000000000000,
+    ]);
 
-impl Score {
-    pub(crate) fn new(
-        score: BlsScalar,
-        y: BlsScalar,
-        y_prime: BlsScalar,
-        r1: BlsScalar,
-        r2: BlsScalar,
-    ) -> Self {
-        Score {
-            score,
-            y,
-            y_prime,
-            r1,
-            r2,
-        }
-    }
-}
+pub(self) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
+    0xffffffff00000000,
+    0x53bda402fffe5bfe,
+    0x0000000000000000,
+    0x0000000000000000,
+]);
 
-#[cfg(feature = "std")]
 impl Bid {
     /// Given a `Bid`, compute it's Score and return it.
     pub fn compute_score(
@@ -121,7 +101,6 @@ impl Bid {
     }
 }
 
-#[cfg(feature = "std")]
 /// Proves that a `Score` is correctly generated.
 /// Prints the proving statements in the passed Constraint System.
 pub fn prove_correct_score_gadget(
@@ -295,7 +274,6 @@ pub fn prove_correct_score_gadget(
     Ok(score_alloc_scalar.var)
 }
 
-#[cfg(feature = "std")]
 /// Given the y parameter, return the y' and it's inverse value.
 fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     let mut bytes = [0u8; 32];
@@ -308,11 +286,10 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     Ok(BlsScalar::from_bytes(&bytes).unwrap())
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Error, Result};
+    use anyhow::Result;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use rand::Rng;
