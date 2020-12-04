@@ -23,12 +23,6 @@ use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "std")]
 use std::io::{self, Read, Write};
 
-/// Size of a serialized Bid.
-/// The size is computed by adding up the `PoseidonCipher` size +
-/// `StealthAddress` size + 1 `JubJubAffine` + 2 `BlsScalar`s + 3 u64's.
-pub const BID_SIZE: usize =
-    PoseidonCipher::cipher_size_bytes() + 64 + 32 * 3 + 8 * 3;
-
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
@@ -80,6 +74,11 @@ where
 }
 
 impl Bid {
+    /// Returns the serialized size of a Bid.
+    pub const fn serialized_size() -> usize {
+        PoseidonCipher::cipher_size_bytes() + 64 + 32 * 3 + 8 * 3
+    }
+
     pub fn new<R>(
         rng: &mut R,
         stealth_address: &StealthAddress,
@@ -198,8 +197,8 @@ impl Bid {
     // mutable references in const fn are unstable
     // see issue #57563 <https://github.com/rust-lang/rust/issues/57563>
     /// Given a Bid, return the byte-representation of it.
-    pub fn to_bytes(&self) -> [u8; BID_SIZE] {
-        let mut buf = [0u8; BID_SIZE];
+    pub fn to_bytes(&self) -> [u8; Bid::serialized_size()] {
+        let mut buf = [0u8; Bid::serialized_size()];
         buf[0..PoseidonCipher::cipher_size_bytes()]
             .copy_from_slice(&self.encrypted_data.to_bytes());
         buf[PoseidonCipher::cipher_size_bytes()..128]
@@ -209,7 +208,8 @@ impl Bid {
         buf[224..256].copy_from_slice(&self.c.to_bytes());
         buf[256..264].copy_from_slice(&self.eligibility.to_le_bytes());
         buf[264..272].copy_from_slice(&self.expiration.to_le_bytes());
-        buf[272..BID_SIZE].copy_from_slice(&self.pos.to_le_bytes());
+        buf[272..Bid::serialized_size()]
+            .copy_from_slice(&self.pos.to_le_bytes());
         buf
     }
 
@@ -217,7 +217,9 @@ impl Bid {
     // mutable references in const fn are unstable
     // see issue #57563 <https://github.com/rust-lang/rust/issues/57563>
     /// Given the byte-representation of a `Bid`, generate one instance of it.
-    pub fn from_bytes(bytes: [u8; BID_SIZE]) -> Result<Bid, BlindBidError> {
+    pub fn from_bytes(
+        bytes: [u8; Bid::serialized_size()],
+    ) -> Result<Bid, BlindBidError> {
         let mut one_cipher = [0u8; PoseidonCipher::cipher_size_bytes()];
         let mut one_scalar = [0u8; 32];
         let mut one_stealth_address = [0u8; 64];
@@ -250,7 +252,7 @@ impl Bid {
         one_u64[..].copy_from_slice(&bytes[264..272]);
         let expiration = u64::from_le_bytes(one_u64);
 
-        one_u64[..].copy_from_slice(&bytes[272..BID_SIZE]);
+        one_u64[..].copy_from_slice(&bytes[272..Bid::serialized_size()]);
         let pos = u64::from_le_bytes(one_u64);
 
         Ok(Bid {
