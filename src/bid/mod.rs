@@ -5,5 +5,6 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 pub use bid::Bid;
+pub use bid::BID_SIZE;
 pub(crate) mod bid;
 pub(crate) mod encoding;
