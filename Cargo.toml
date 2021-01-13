@@ -5,20 +5,20 @@ authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"
 edition = "2018"
 
 [dependencies]
-dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.4.1", default-features = false}
-poseidon252 = {git = "https://github.com/dusk-network/poseidon252", tag = "v0.15.0", default-features = false}
-dusk-bls12_381 = {version = "0.3", default-features = false}
-dusk-jubjub = {version = "0.5", default-features = false}
-dusk-plonk = {version = "0.3", features = ["trace-print"], optional = true}
-num-bigint = {version = "0.3", optional = true } 
-num-traits = {version = "0.2", optional = true } 
-plonk_gadgets = {git = "https://github.com/dusk-network/plonk_gadgets", tag = "v0.4.3", optional = true}
-rand_core = {version = "0.5", default-features = false}  
+dusk-pki = {git="https://github.com/dusk-network/dusk-pki", branch="vlopes11/bump-bls", default-features=false}
+poseidon252 = {git="https://github.com/dusk-network/Poseidon252", branch="vlopes11/bump-plonk", default-features=false}
+dusk-bls12_381 = {git="https://github.com/dusk-network/bls12_381", branch="vlopes11/g1affine-raw-bytes", default-features=false}
+dusk-jubjub = {git="https://github.com/dusk-network/jubjub", branch="vlopes11/g1affine-unchecked-bytes", default-features=false}
+dusk-plonk = {git="https://github.com/dusk-network/plonk", branch="vlopes11/332-proverkey-from-unchecked", optional=true}
+num-bigint = {version = "0.3", optional = true }
+num-traits = {version = "0.2", optional = true }
+plonk_gadgets = {git="https://github.com/dusk-network/plonk_gadgets", branch="vlopes11/bump-bls", optional=true}
+rand_core = {version = "0.5", default-features = false}
 lazy_static = "1.4.0"
-rand = {version = "0.7", default-features = false, optional = true }
-canonical = { version = "0.4", optional = true }
-canonical_derive = { version = "0.4", optional = true }
-anyhow = {version = "1", optional = true}
+rand = {version = "0.7", default-features=false, optional=true}
+canonical = {version="0.4", optional=true}
+canonical_derive = {version="0.4", optional=true}
+anyhow = {version="1", optional=true}
 
 [dev-dependencies]
 canonical_host = "0.4"
