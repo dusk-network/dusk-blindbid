@@ -12,6 +12,7 @@ use canonical::Store;
 use canonical_host::MemStore;
 use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_blindbid::{bid::Bid, score_gen::Score};
+use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
@@ -30,17 +31,6 @@ where
     /// Constructor
     pub fn new() -> Self {
         Self(PoseidonTree::new())
-    }
-
-    /// Reference to the internal poseidon tree
-    ///
-    /// We don't have a mutable reference available because all its mutation
-    /// should be protected by encapsulation
-    #[allow(dead_code)]
-    pub fn inner(
-        &self,
-    ) -> &PoseidonTree<Bid, PoseidonMaxAnnotation, S, 17usize> {
-        &self.0
     }
 
     /// Get a bid from a provided index
@@ -67,7 +57,10 @@ where
 
 fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     let mut rng = rand::thread_rng();
-    let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+    let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+        JubJubScalar::one(),
+        -JubJubScalar::one(),
+    ));
     let stealth_addr = pk_r.gen_stealth_address(&secret);
     let secret = GENERATOR_EXTENDED * secret;
     let value: u64 =
@@ -126,7 +119,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -159,7 +152,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -214,7 +207,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -251,7 +244,7 @@ mod protocol_tests {
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -333,7 +326,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -358,7 +351,10 @@ mod protocol_tests {
         // Create an expired bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+            JubJubScalar::one(),
+            -JubJubScalar::one(),
+        ));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
@@ -397,7 +393,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -435,7 +431,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -460,7 +456,10 @@ mod protocol_tests {
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+            JubJubScalar::one(),
+            -JubJubScalar::one(),
+        ));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
@@ -500,7 +499,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -538,7 +537,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -562,7 +561,7 @@ mod serialization_tests {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());
         let bid_hash = bid.hash();
         let bytes = bid.to_bytes();
-        let bid2 = Bid::from_bytes(bytes)?;
+        let bid2 = Bid::from_bytes(&bytes)?;
         let bid_hash_2 = bid2.hash();
         assert_eq!(bid_hash.0, bid_hash_2.0);
         Ok(())

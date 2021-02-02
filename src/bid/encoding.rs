@@ -9,13 +9,14 @@
 
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
+use dusk_bytes::Serializable;
 #[cfg(feature = "std")]
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 #[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-use poseidon252::sponge::hash as sponge_hash;
 #[cfg(feature = "std")]
-use poseidon252::sponge::sponge::sponge_hash_gadget;
+use poseidon252::sponge::gadget as sponge_hash_gadget;
+use poseidon252::sponge::hash as sponge_hash;
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -51,7 +52,7 @@ impl Bid {
 
         // Push both JubJubAffine coordinates as a Scalar.
         {
-            let tmp = self.stealth_address.pk_r().to_hash_inputs();
+            let tmp = self.stealth_address.pk_r().as_ref().to_hash_inputs();
             words_deposit[3] = tmp[0];
             words_deposit[4] = tmp[1];
         }
@@ -165,7 +166,10 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::from(*secret);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+            JubJubScalar::one(),
+            -JubJubScalar::one(),
+        ));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
@@ -217,7 +221,7 @@ mod tests {
             let bid_stealth_addr = (
                 Point::from_private_affine(
                     composer,
-                    bid.stealth_address.pk_r().into(),
+                    bid.stealth_address.pk_r().as_ref().into(),
                 ),
                 Point::from_private_affine(
                     composer,

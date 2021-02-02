@@ -10,8 +10,8 @@
 use super::Score;
 use crate::bid::Bid;
 use crate::errors::BlindBidError;
-use anyhow::{Error as AnyhowError, Result};
 use dusk_bls12_381::BlsScalar;
+use dusk_bytes::Serializable;
 use dusk_jubjub::JubJubAffine;
 use dusk_plonk::prelude::*;
 use num_bigint::BigUint;
@@ -19,8 +19,8 @@ use num_traits::{One, Zero};
 use plonk_gadgets::{
     AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
+use poseidon252::sponge::gadget as sponge_hash_gadget;
 use poseidon252::sponge::hash as sponge_hash;
-use poseidon252::sponge::sponge::sponge_hash_gadget;
 
 pub(self) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
     BlsScalar::from_raw([
@@ -112,7 +112,7 @@ pub fn prove_correct_score_gadget(
     consensus_round_seed: AllocatedScalar,
     latest_consensus_round: AllocatedScalar,
     latest_consensus_step: AllocatedScalar,
-) -> Result<Variable, AnyhowError> {
+) -> Variable {
     // Allocate constant one & zero values.
     let one = composer.add_witness_to_circuit_description(BlsScalar::one());
     let zero = composer.add_witness_to_circuit_description(BlsScalar::zero());
@@ -271,7 +271,7 @@ pub fn prove_correct_score_gadget(
         BlsScalar::zero(),
     );
 
-    Ok(score_alloc_scalar.var)
+    score_alloc_scalar.var
 }
 
 /// Given the y parameter, return the y' and it's inverse value.
@@ -290,6 +290,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use dusk_bytes::Serializable;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use rand::Rng;
@@ -298,7 +299,10 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+            JubJubScalar::one(),
+            -JubJubScalar::one(),
+        ));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())

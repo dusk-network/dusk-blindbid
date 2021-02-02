@@ -6,6 +6,7 @@
 
 //! BlindBid impl
 #![allow(non_snake_case)]
+#![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod bid;
