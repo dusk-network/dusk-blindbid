@@ -10,20 +10,16 @@
 
 mod tree_assets;
 use anyhow::Result;
-use canonical::Store;
 use canonical_host::MemStore;
 use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_blindbid::{bid::Bid, score_gen::Score};
+use dusk_blindbid::{V_RAW_MAX, V_RAW_MIN};
 use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
-use poseidon252::tree::{PoseidonBranch, PoseidonMaxAnnotation, PoseidonTree};
 use rand::Rng;
-use tree_assets::{BidLeaf, BidTree};
-
-const V_RAW_MIN: u64 = 50_000u64;
-const V_RAW_MAX: u64 = 250_000u64;
+use tree_assets::BidTree;
 
 fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     let mut rng = rand::thread_rng();
@@ -33,8 +29,7 @@ fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     ));
     let stealth_addr = pk_r.gen_stealth_address(&secret);
     let secret = GENERATOR_EXTENDED * secret;
-    let value: u64 =
-        (&mut rand::thread_rng()).gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+    let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
     let value = JubJubScalar::from(value);
     // Set the timestamps as the max values so the proofs do not fail for them
     // (never expired or non-elegible).
@@ -325,8 +320,8 @@ mod protocol_tests {
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value: u64 =
+            (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
         let value = JubJubScalar::from(value);
         let expiration_ts = 100u64;
         let elegibility_ts = 1000u64;
@@ -427,8 +422,8 @@ mod protocol_tests {
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value: u64 =
+            (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
         let value = JubJubScalar::from(value);
         let expiration_ts = 100u64;
         let elegibility_ts = 1000u64;

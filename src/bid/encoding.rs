@@ -14,7 +14,6 @@ use dusk_bytes::Serializable;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 #[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-#[cfg(feature = "std")]
 use poseidon252::sponge;
 
 // 1. Generate the type_fields Scalar Id:

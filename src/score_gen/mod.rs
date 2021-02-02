@@ -23,7 +23,7 @@ pub struct Score {
 }
 
 impl Score {
-    pub(crate) fn new(
+    pub fn new(
         score: BlsScalar,
         y: BlsScalar,
         y_prime: BlsScalar,

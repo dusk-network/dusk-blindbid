@@ -20,11 +20,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: dusk-analyzer
-          
-  test_nightly:
+
+  test_nightly_canon_std:
     name: Nightly tests canon + std
     runs-on: ubuntu-latest
-    env: 
+    env:
       RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
@@ -37,12 +37,11 @@ jobs:
         with:
           command: test
           args: --release
-          
 
-  test_nightly:
+  test_nightly_nostd:
     name: Nightly tests no_std
     runs-on: ubuntu-latest
-    env: 
+    env:
       RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
@@ -55,11 +54,11 @@ jobs:
         with:
           command: test
           args: --release --no-default-features
-   
-  test_nightly:
+
+  test_nightly_canon_nostd:
     name: Nightly tests no_std + canon
     runs-on: ubuntu-latest
-    env: 
+    env:
       RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
