@@ -19,8 +19,7 @@ use num_traits::{One, Zero};
 use plonk_gadgets::{
     AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
-use poseidon252::sponge::gadget as sponge_hash_gadget;
-use poseidon252::sponge::hash as sponge_hash;
+use poseidon252::sponge;
 
 pub(self) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
     BlsScalar::from_raw([
@@ -58,7 +57,7 @@ impl Bid {
 
         // Compute `y` where `y = H(secret_k, Merkle_root, consensus_round_seed,
         // latest_consensus_round, latest_consensus_step)`.
-        let y = sponge_hash(&[
+        let y = sponge::hash(&[
             secret_k,
             bid_tree_root,
             consensus_round_seed,
@@ -125,7 +124,7 @@ pub fn prove_correct_score_gadget(
     let two_pow_128 = BlsScalar::from(2u64).pow(&[128, 0, 0, 0]);
 
     // 1. y = H(k||H(Bi)||sigma^s||k^t||k^s)
-    let should_be_y = sponge_hash_gadget(
+    let should_be_y = sponge::gadget(
         composer,
         &[
             secret_k.var,
@@ -281,7 +280,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     if biguint_bytes.len() > 32 {
         return Err(BlindBidError::InvalidScoreFieldsLen);
     };
-    bytes[..biguint_bytes.len()].copy_from_slice(&biguint_bytes[..]);
+    bytes[..biguint_bytes.len()].copy_from_slice(&biguint_bytes);
     // Due to the previous conditions, we can unwrap here safely.
     Ok(BlsScalar::from_bytes(&bytes).unwrap())
 }
@@ -299,10 +298,7 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let secret_k = BlsScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
-            JubJubScalar::one(),
-            -JubJubScalar::one(),
-        ));
+        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
@@ -368,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_score_gen_proof() -> Result<(), AnyhowError> {
+    fn correct_score_gen_proof() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -431,7 +427,7 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        )?;
+        );
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -463,13 +459,13 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        )?;
+        );
         verifier.preprocess(&ck)?;
         verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
     }
 
     #[test]
-    fn incorrect_score_gen_proof() -> Result<(), AnyhowError> {
+    fn incorrect_score_gen_proof() -> Result<()> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -534,7 +530,7 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        )?;
+        );
         prover.preprocess(&ck)?;
         let proof = prover.prove(&ck)?;
 
@@ -566,7 +562,7 @@ mod tests {
             alloc_consensus_round_seed,
             alloc_latest_consensus_round,
             alloc_latest_consensus_step,
-        )?;
+        );
         verifier.preprocess(&ck)?;
         assert!(verifier
             .verify(&proof, &vk, &vec![BlsScalar::zero()])

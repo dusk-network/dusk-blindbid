@@ -9,21 +9,16 @@
 use crate::errors::BlindBidError;
 #[cfg(feature = "canon")]
 use canonical::Canon;
-#[cfg(all(feature = "canon", feature = "std"))]
-use canonical::Store;
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
-use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
-use dusk_bytes::Serializable;
+use dusk_bytes::{DeserializableSlice, Serializable};
 use dusk_jubjub::{
     JubJubAffine, JubJubScalar, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_pki::{Ownable, StealthAddress};
 use poseidon252::cipher::PoseidonCipher;
-use poseidon252::sponge::hash as sponge_hash;
-#[cfg(feature = "std")]
-use poseidon252::tree::PoseidonLeaf;
+use poseidon252::sponge;
 use rand_core::{CryptoRng, RngCore};
 
 #[derive(Copy, Clone, Debug)]
@@ -53,12 +48,6 @@ impl Ownable for Bid {
     }
 }
 
-impl Borrow<u64> for Bid {
-    fn borrow(&self) -> &u64 {
-        &self.pos
-    }
-}
-
 impl PartialEq for Bid {
     fn eq(&self, other: &Self) -> bool {
         self.hash().eq(&other.hash())
@@ -67,39 +56,33 @@ impl PartialEq for Bid {
 
 // This needs to be between braces since const fn calls passed as const_generics
 // params aren't perfectly supported yet.
-impl Serializable<{ Bid::serialized_size() }> for Bid {
-    type Error = BlindBidError;
+impl
+    Serializable<
+        {
+            PoseidonCipher::SIZE
+                + StealthAddress::SIZE
+                + 2 * BlsScalar::SIZE
+                + JubJubAffine::SIZE
+                + 8 * 3
+        },
+    > for Bid
+{
+    type Error = dusk_bytes::Error;
 
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Bid, Self::Error> {
-        let mut one_cipher = [0u8; PoseidonCipher::cipher_size_bytes()];
-        let mut one_scalar = [0u8; 32];
-        let mut one_stealth_address = [0u8; 64];
         let mut one_u64 = [0u8; 8];
-
-        one_cipher[..]
-            .copy_from_slice(&buf[0..PoseidonCipher::cipher_size_bytes()]);
-        let encrypted_data = PoseidonCipher::from_bytes(&one_cipher)?;
-
-        one_scalar[..]
-            .copy_from_slice(&buf[PoseidonCipher::cipher_size_bytes()..128]);
-        let nonce = BlsScalar::from_bytes(&one_scalar)?;
-
-        one_stealth_address[..].copy_from_slice(&buf[128..192]);
-        let stealth_address = StealthAddress::from_bytes(&one_stealth_address)?;
-
-        one_scalar[..].copy_from_slice(&buf[192..224]);
-        let hashed_secret = BlsScalar::from_bytes(&one_scalar)?;
-
-        one_scalar[..].copy_from_slice(&buf[224..256]);
-        let c = JubJubAffine::from_bytes(&one_scalar)?;
-
+        let encrypted_data =
+            PoseidonCipher::from_slice(&buf[0..PoseidonCipher::SIZE])?;
+        let nonce = BlsScalar::from_slice(&buf[PoseidonCipher::SIZE..128])?;
+        let stealth_address = StealthAddress::from_slice(&buf[128..192])?;
+        let hashed_secret = BlsScalar::from_slice(&buf[192..224])?;
+        let c = JubJubAffine::from_slice(&buf[224..256])?;
+        // TODO: Change once https://github.com/dusk-network/dusk-bytes/issues/12 is addressed.
         one_u64[..].copy_from_slice(&buf[256..264]);
         let eligibility = u64::from_le_bytes(one_u64);
-
         one_u64[..].copy_from_slice(&buf[264..272]);
         let expiration = u64::from_le_bytes(one_u64);
-
-        one_u64[..].copy_from_slice(&buf[272..Bid::serialized_size()]);
+        one_u64[..].copy_from_slice(&buf[272..Self::SIZE]);
         let pos = u64::from_le_bytes(one_u64);
 
         Ok(Bid {
@@ -116,48 +99,22 @@ impl Serializable<{ Bid::serialized_size() }> for Bid {
 
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
-        buf[0..PoseidonCipher::cipher_size_bytes()]
+        buf[0..PoseidonCipher::SIZE]
             .copy_from_slice(&self.encrypted_data.to_bytes());
-        buf[PoseidonCipher::cipher_size_bytes()..128]
-            .copy_from_slice(&self.nonce.to_bytes());
+        buf[PoseidonCipher::SIZE..128].copy_from_slice(&self.nonce.to_bytes());
         buf[128..192].copy_from_slice(&self.stealth_address.to_bytes());
         buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
         buf[224..256].copy_from_slice(&self.c.to_bytes());
         buf[256..264].copy_from_slice(&self.eligibility.to_le_bytes());
         buf[264..272].copy_from_slice(&self.expiration.to_le_bytes());
-        buf[272..Bid::serialized_size()]
-            .copy_from_slice(&self.pos.to_le_bytes());
+        buf[272..Self::SIZE].copy_from_slice(&self.pos.to_le_bytes());
         buf
     }
 }
 
 impl Eq for Bid {}
 
-// TODO: Remove probably. Ask team.
-#[cfg(all(feature = "canon", feature = "std"))]
-impl<S> PoseidonLeaf<S> for Bid
-where
-    S: Store,
-{
-    fn poseidon_hash(&self) -> BlsScalar {
-        self.hash()
-    }
-
-    fn pos(&self) -> u64 {
-        self.pos
-    }
-
-    fn set_pos(&mut self, pos: u64) {
-        self.pos = pos;
-    }
-}
-
 impl Bid {
-    /// Returns the serialized size of a Bid.
-    pub const fn serialized_size() -> usize {
-        PoseidonCipher::cipher_size_bytes() + 64 + 32 * 3 + 8 * 3
-    }
-
     /// Generates a new [Bid](self::Bid) from a rng source plus it's fields.  
     pub fn new<R>(
         rng: &mut R,
@@ -194,7 +151,7 @@ impl Bid {
         // Generate an empty Bid and fill it with the correct values
         let mut bid = Bid {
             // Compute and add the `hashed_secret` to the Bid.
-            hashed_secret: sponge_hash(&[secret_k]),
+            hashed_secret: sponge::hash(&[secret_k]),
             eligibility,
             expiration,
             c: JubJubAffine::default(),
@@ -220,7 +177,7 @@ impl Bid {
         latest_consensus_round: BlsScalar,
         latest_consensus_step: BlsScalar,
     ) -> BlsScalar {
-        sponge_hash(&[
+        sponge::hash(&[
             secret_k,
             consensus_round_seed,
             latest_consensus_round,

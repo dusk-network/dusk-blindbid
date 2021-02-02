@@ -24,6 +24,8 @@ jobs:
   test_nightly:
     name: Nightly tests canon + std
     runs-on: ubuntu-latest
+    env: 
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -35,14 +37,13 @@ jobs:
         with:
           command: test
           args: --release
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release
+          
 
   test_nightly:
     name: Nightly tests no_std
     runs-on: ubuntu-latest
+    env: 
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -50,10 +51,6 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -62,6 +59,8 @@ jobs:
   test_nightly:
     name: Nightly tests no_std + canon
     runs-on: ubuntu-latest
+    env: 
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -69,10 +68,6 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release
       - uses: actions-rs/cargo@v1
         with:
           command: test

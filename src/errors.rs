@@ -40,8 +40,8 @@ pub enum BlindBidError {
     WrongSecretProvided,
     /// Invalid encoding/decoding
     IOError,
-    /// Serde Error
-    SerdeErr(DuskBytesError),
+    /// Dusk-bytes serialization error
+    SerializationError(DuskBytesError),
 }
 
 #[cfg(feature = "std")]
@@ -63,6 +63,6 @@ impl From<BlindBidError> for std::io::Error {
 
 impl From<DuskBytesError> for BlindBidError {
     fn from(bytes_err: DuskBytesError) -> Self {
-        Self::SerdeErr(bytes_err)
+        Self::SerializationError(bytes_err)
     }
 }

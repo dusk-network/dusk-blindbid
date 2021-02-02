@@ -7,6 +7,8 @@
 #![allow(non_snake_case)]
 #![cfg(feature = "canon")]
 #![cfg(feature = "std")]
+
+mod tree_assets;
 use anyhow::Result;
 use canonical::Store;
 use canonical_host::MemStore;
@@ -18,42 +20,10 @@ use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
 use poseidon252::tree::{PoseidonBranch, PoseidonMaxAnnotation, PoseidonTree};
 use rand::Rng;
+use tree_assets::{BidLeaf, BidTree};
 
 const V_RAW_MIN: u64 = 50_000u64;
 const V_RAW_MAX: u64 = 250_000u64;
-
-struct BidTree<S: Store>(PoseidonTree<Bid, PoseidonMaxAnnotation, S, 17usize>);
-
-impl<S> BidTree<S>
-where
-    S: Store,
-{
-    /// Constructor
-    pub fn new() -> Self {
-        Self(PoseidonTree::new())
-    }
-
-    /// Get a bid from a provided index
-    #[allow(dead_code)]
-    pub fn get(&self, idx: u64) -> Option<Bid> {
-        self.0.get(idx as usize).unwrap()
-    }
-
-    /// Append a bid to the tree and return its index
-    ///
-    /// The index will be the last available position
-    pub fn push(&mut self, bid: Bid) -> usize {
-        self.0.push(bid).unwrap()
-    }
-
-    /// Returns a poseidon branch pointing at the specific index
-    pub fn poseidon_branch(
-        &self,
-        idx: usize,
-    ) -> Option<PoseidonBranch<17usize>> {
-        self.0.branch(idx).unwrap()
-    }
-}
 
 fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     let mut rng = rand::thread_rng();
@@ -107,7 +77,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -195,7 +165,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -278,7 +248,7 @@ mod protocol_tests {
         let latest_consensus_step = 25519u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -351,10 +321,7 @@ mod protocol_tests {
         // Create an expired bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
-            JubJubScalar::one(),
-            -JubJubScalar::one(),
-        ));
+        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
@@ -375,7 +342,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -456,10 +423,7 @@ mod protocol_tests {
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::new(
-            JubJubScalar::one(),
-            -JubJubScalar::one(),
-        ));
+        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
@@ -480,7 +444,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree

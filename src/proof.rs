@@ -16,7 +16,7 @@ use dusk_plonk::constraint_system::ecc::{
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
-    sponge::gadget as sponge_hash_gadget,
+    sponge,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 
@@ -230,7 +230,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         composer.range_gate(bid_value.var, 64usize);
 
         // 7. `m = H(k)` Secret key pre-image check.
-        let secret_k_hash = sponge_hash_gadget(composer, &[secret_k.var]);
+        let secret_k_hash = sponge::gadget(composer, &[secret_k.var]);
         // Add PI constraint for the secret_k_hash.
         pi.push(PublicInput::BlsScalar(
             -bid.hashed_secret,
@@ -248,7 +248,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // We generate the prover_id and constrain it to a public input
         // On that way we bind the Score to the correct id.
         // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
-        let prover_id = sponge_hash_gadget(
+        let prover_id = sponge::gadget(
             composer,
             &[
                 secret_k.var,
