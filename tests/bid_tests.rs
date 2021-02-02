@@ -7,71 +7,29 @@
 #![allow(non_snake_case)]
 #![cfg(feature = "canon")]
 #![cfg(feature = "std")]
+
+mod tree_assets;
 use anyhow::Result;
-use canonical::Store;
 use canonical_host::MemStore;
 use dusk_blindbid::proof::BlindBidCircuit;
 use dusk_blindbid::{bid::Bid, score_gen::Score};
+use dusk_blindbid::{V_RAW_MAX, V_RAW_MIN};
+use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
-use poseidon252::tree::{PoseidonBranch, PoseidonMaxAnnotation, PoseidonTree};
 use rand::Rng;
-
-const V_RAW_MIN: u64 = 50_000u64;
-const V_RAW_MAX: u64 = 250_000u64;
-
-struct BidTree<S: Store>(PoseidonTree<Bid, PoseidonMaxAnnotation, S, 17usize>);
-
-impl<S> BidTree<S>
-where
-    S: Store,
-{
-    /// Constructor
-    pub fn new() -> Self {
-        Self(PoseidonTree::new())
-    }
-
-    /// Reference to the internal poseidon tree
-    ///
-    /// We don't have a mutable reference available because all its mutation
-    /// should be protected by encapsulation
-    #[allow(dead_code)]
-    pub fn inner(
-        &self,
-    ) -> &PoseidonTree<Bid, PoseidonMaxAnnotation, S, 17usize> {
-        &self.0
-    }
-
-    /// Get a bid from a provided index
-    #[allow(dead_code)]
-    pub fn get(&self, idx: u64) -> Option<Bid> {
-        self.0.get(idx as usize).unwrap()
-    }
-
-    /// Append a bid to the tree and return its index
-    ///
-    /// The index will be the last available position
-    pub fn push(&mut self, bid: Bid) -> usize {
-        self.0.push(bid).unwrap()
-    }
-
-    /// Returns a poseidon branch pointing at the specific index
-    pub fn poseidon_branch(
-        &self,
-        idx: usize,
-    ) -> Option<PoseidonBranch<17usize>> {
-        self.0.branch(idx).unwrap()
-    }
-}
+use tree_assets::BidTree;
 
 fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     let mut rng = rand::thread_rng();
-    let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+    let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+        JubJubScalar::one(),
+        -JubJubScalar::one(),
+    ));
     let stealth_addr = pk_r.gen_stealth_address(&secret);
     let secret = GENERATOR_EXTENDED * secret;
-    let value: u64 =
-        (&mut rand::thread_rng()).gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+    let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
     let value = JubJubScalar::from(value);
     // Set the timestamps as the max values so the proofs do not fail for them
     // (never expired or non-elegible).
@@ -114,7 +72,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -126,7 +84,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -159,7 +117,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -202,7 +160,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -214,7 +172,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -251,7 +209,7 @@ mod protocol_tests {
             circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -285,7 +243,7 @@ mod protocol_tests {
         let latest_consensus_step = 25519u64;
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -333,7 +291,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -358,12 +316,12 @@ mod protocol_tests {
         // Create an expired bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value: u64 =
+            (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
         let value = JubJubScalar::from(value);
         let expiration_ts = 100u64;
         let elegibility_ts = 1000u64;
@@ -379,7 +337,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -397,7 +355,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -435,7 +393,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -460,12 +418,12 @@ mod protocol_tests {
         // Create a non-elegible Bid.
         let mut rng = rand::thread_rng();
         let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::default());
+        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
         let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+        let value: u64 =
+            (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
         let value = JubJubScalar::from(value);
         let expiration_ts = 100u64;
         let elegibility_ts = 1000u64;
@@ -481,7 +439,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid);
+        tree.push(bid.into());
 
         // Extract the branch
         let branch = tree
@@ -500,7 +458,7 @@ mod protocol_tests {
             .compute_score(
                 &secret,
                 secret_k,
-                branch.root(),
+                *branch.root(),
                 consensus_round_seed,
                 latest_consensus_round,
                 latest_consensus_step,
@@ -538,7 +496,7 @@ mod protocol_tests {
         let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
         let storage_bid = bid.hash();
         let pi = vec![
-            PublicInput::BlsScalar(branch.root(), 0),
+            PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
             PublicInput::BlsScalar(bid.hashed_secret, 0),
@@ -562,7 +520,7 @@ mod serialization_tests {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());
         let bid_hash = bid.hash();
         let bytes = bid.to_bytes();
-        let bid2 = Bid::from_bytes(bytes)?;
+        let bid2 = Bid::from_bytes(&bytes)?;
         let bid_hash_2 = bid2.hash();
         assert_eq!(bid_hash.0, bid_hash_2.0);
         Ok(())

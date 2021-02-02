@@ -6,6 +6,7 @@
 
 //! Errors related to the BlindBid module
 
+use dusk_bytes::Error as DuskBytesError;
 use dusk_jubjub::JubJubScalar;
 #[cfg(feature = "std")]
 use std::fmt;
@@ -39,6 +40,8 @@ pub enum BlindBidError {
     WrongSecretProvided,
     /// Invalid encoding/decoding
     IOError,
+    /// Dusk-bytes serialization error
+    SerializationError(DuskBytesError),
 }
 
 #[cfg(feature = "std")]
@@ -55,5 +58,11 @@ impl From<BlindBidError> for std::io::Error {
             std::io::ErrorKind::InvalidData,
             format!("{:?}", err),
         )
+    }
+}
+
+impl From<DuskBytesError> for BlindBidError {
+    fn from(bytes_err: DuskBytesError) -> Self {
+        Self::SerializationError(bytes_err)
     }
 }

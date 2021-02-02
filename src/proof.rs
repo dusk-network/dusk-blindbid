@@ -7,7 +7,7 @@
 //! BlindBidProof module.
 use crate::bid::{encoding::preimage_gadget, Bid};
 use crate::score_gen::{score::prove_correct_score_gadget, Score};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use dusk_bls12_381::BlsScalar;
 use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_plonk::constraint_system::ecc::{
@@ -16,7 +16,7 @@ use dusk_plonk::constraint_system::ecc::{
 use dusk_plonk::prelude::*;
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 use poseidon252::{
-    sponge::sponge::sponge_hash_gadget,
+    sponge,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 
@@ -67,7 +67,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let bid_stealth_addr = (
             Point::from_private_affine(
                 composer,
-                bid.stealth_address.pk_r().into(),
+                bid.stealth_address.pk_r().as_ref().into(),
             ),
             Point::from_private_affine(
                 composer,
@@ -106,7 +106,8 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             AllocatedScalar::allocate(composer, decrypted_data[1]);
         // Allocate the bid tree root to be used later by the score_generation
         // gadget.
-        let bid_tree_root = AllocatedScalar::allocate(composer, branch.root());
+        let bid_tree_root =
+            AllocatedScalar::allocate(composer, branch.root().clone());
 
         // ------------------------------------------------------- //
         //                                                         //
@@ -229,7 +230,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         composer.range_gate(bid_value.var, 64usize);
 
         // 7. `m = H(k)` Secret key pre-image check.
-        let secret_k_hash = sponge_hash_gadget(composer, &[secret_k.var]);
+        let secret_k_hash = sponge::gadget(composer, &[secret_k.var]);
         // Add PI constraint for the secret_k_hash.
         pi.push(PublicInput::BlsScalar(
             -bid.hashed_secret,
@@ -247,7 +248,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // We generate the prover_id and constrain it to a public input
         // On that way we bind the Score to the correct id.
         // 8. `prover_id = H(secret_k, sigma^s, k^t, k^s)`. Preimage check
-        let prover_id = sponge_hash_gadget(
+        let prover_id = sponge::gadget(
             composer,
             &[
                 secret_k.var,
@@ -290,10 +291,6 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             latest_consensus_round,
             latest_consensus_step,
         );
-        let computed_score = match computed_score {
-            Ok(score) => Ok(score),
-            Err(e) => Err(anyhow!(format!("{:?}", e))),
-        }?;
 
         // Constraint the score to be the public one and set it in the PI
         // constructor.
