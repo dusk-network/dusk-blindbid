@@ -179,12 +179,6 @@ impl Bid {
         self.nonce
     }
 
-    /// Returns a mutable ref pointing to the `nonce` field of the
-    /// [Bid](self::Bid).
-    pub fn nonce_mut(&mut self) -> &mut BlsScalar {
-        &mut self.nonce
-    }
-
     /// Returns the `hashed_secret` field of the [Bid](self::Bid).
     pub fn hashed_secret(&self) -> BlsScalar {
         self.hashed_secret
