@@ -214,7 +214,7 @@ impl Bid {
 
     /// Returns a mutable ref pointing to the `pos` field of the
     /// [Bid](self::Bid).
-    pub fn pos_mut(&mut self) -> &mut u64 {
+    pub fn set_pos(&mut self) -> &mut u64 {
         &mut self.pos
     }
 
