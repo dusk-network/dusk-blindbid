@@ -6,32 +6,30 @@
 
 //! Score generation
 
-#[cfg(feature = "canon")]
-use canonical::Canon;
-#[cfg(feature = "canon")]
-use canonical_derive::Canon;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "canon")] {
+        use canonical::Canon;
+        use canonical_derive::Canon;
+    }
+}
 
-#[cfg(feature = "std")]
-use crate::bid::Bid;
-#[cfg(feature = "std")]
-use crate::errors::BlindBidError;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        use crate::errors::BlindBidError;
+        use crate::bid::Bid;
+        use dusk_jubjub::JubJubAffine;
+        use dusk_plonk::prelude::*;
+        use num_bigint::BigUint;
+        use num_traits::{One, Zero};
+        use poseidon252::sponge;use plonk_gadgets::{
+            AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
+};
+    }
+}
+
 use core::ops::Deref;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
-#[cfg(feature = "std")]
-use dusk_jubjub::JubJubAffine;
-#[cfg(feature = "std")]
-use dusk_plonk::prelude::*;
-#[cfg(feature = "std")]
-use num_bigint::BigUint;
-#[cfg(feature = "std")]
-use num_traits::{One, Zero};
-#[cfg(feature = "std")]
-use plonk_gadgets::{
-    AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
-};
-#[cfg(feature = "std")]
-use poseidon252::sponge;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "canon", derive(Canon))]
