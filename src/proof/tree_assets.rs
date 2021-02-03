@@ -5,13 +5,11 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
-#![cfg(feature = "canon")]
-#![cfg(feature = "std")]
 
+use crate::Bid;
 use canonical::{Canon, Store};
 use canonical_derive::Canon;
 use core::borrow::Borrow;
-use dusk_blindbid::bid::Bid;
 use dusk_bls12_381::BlsScalar;
 use poseidon252::tree::{
     PoseidonBranch, PoseidonLeaf, PoseidonMaxAnnotation, PoseidonTree,
@@ -41,7 +39,7 @@ impl BidLeaf {
 
 impl Borrow<u64> for BidLeaf {
     fn borrow(&self) -> &u64 {
-        &self.0.pos
+        self.0.borrow()
     }
 }
 
@@ -66,11 +64,11 @@ where
     }
 
     fn pos(&self) -> u64 {
-        self.0.pos
+        self.0.pos()
     }
 
     fn set_pos(&mut self, pos: u64) {
-        self.0.pos = pos;
+        *self.0.set_pos() = pos;
     }
 }
 

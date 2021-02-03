@@ -5,11 +5,13 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! BlindBidProof module.
+
+use crate::bid::score::Score;
 use crate::bid::{encoding::preimage_gadget, Bid};
-use crate::score_gen::{score::prove_correct_score_gadget, Score};
 use anyhow::Result;
 use dusk_bls12_381::BlsScalar;
 use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
+use dusk_pki::Ownable;
 use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,
 };
@@ -19,6 +21,10 @@ use poseidon252::{
     sponge,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
+#[cfg(test)]
+mod bid_tests;
+#[cfg(test)]
+mod tree_assets;
 
 #[derive(Debug, Clone)]
 pub struct BlindBidCircuit<'a> {
@@ -58,31 +64,33 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let bid_hash = AllocatedScalar::allocate(composer, storage_bid);
         // Allocate Bid-internal fields
         let bid_hashed_secret =
-            AllocatedScalar::allocate(composer, bid.hashed_secret);
+            AllocatedScalar::allocate(composer, bid.hashed_secret());
         let bid_cipher = (
-            composer.add_input(bid.encrypted_data.cipher()[0]),
-            composer.add_input(bid.encrypted_data.cipher()[1]),
+            composer.add_input(bid.encrypted_data().cipher()[0]),
+            composer.add_input(bid.encrypted_data().cipher()[1]),
         );
-        let bid_commitment = Point::from_private_affine(composer, bid.c);
+        let bid_commitment =
+            Point::from_private_affine(composer, bid.commitment());
         let bid_stealth_addr = (
             Point::from_private_affine(
                 composer,
-                bid.stealth_address.pk_r().as_ref().into(),
+                bid.stealth_address().pk_r().as_ref().into(),
             ),
             Point::from_private_affine(
                 composer,
-                bid.stealth_address.R().into(),
+                bid.stealth_address().R().into(),
             ),
         );
         let bid_eligibility_ts = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.eligibility),
+            BlsScalar::from(bid.eligibility()),
         );
         let bid_expiration = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.expiration),
+            BlsScalar::from(bid.expiration()),
         );
-        let pos = AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
+        let pos =
+            AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos()));
         // Allocate bid-needed inputs
         let secret_k = AllocatedScalar::allocate(composer, secret_k);
         let seed = AllocatedScalar::allocate(composer, seed);
@@ -97,13 +105,11 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // care) about the real values here (just about filling the
         // composer). And provers won't get any info about if this
         // secret can or not decrypt the cipher.
-        let decrypted_data = bid
-            .encrypted_data
-            .decrypt(&secret, &bid.nonce)
-            .unwrap_or([BlsScalar::one(), BlsScalar::one()]);
-        let bid_value = AllocatedScalar::allocate(composer, decrypted_data[0]);
-        let bid_blinder =
-            AllocatedScalar::allocate(composer, decrypted_data[1]);
+        let (value, blinder) = bid
+            .decrypt_data(&secret)
+            .unwrap_or((JubJubScalar::one(), JubJubScalar::one()));
+        let bid_value = AllocatedScalar::allocate(composer, value.into());
+        let bid_blinder = AllocatedScalar::allocate(composer, blinder.into());
         // Allocate the bid tree root to be used later by the score_generation
         // gadget.
         let bid_tree_root =
@@ -217,13 +223,13 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let computed_c = p1.point().fast_add(composer, *p2.point());
         // Add PI constraint for the commitment computation check.
         pi.push(PublicInput::AffinePoint(
-            bid.c,
+            bid.commitment(),
             composer.circuit_size(),
             composer.circuit_size() + 1,
         ));
 
         // Assert computed_commitment == announced commitment.
-        composer.assert_equal_public_point(computed_c, bid.c);
+        composer.assert_equal_public_point(computed_c, bid.commitment());
 
         // 6. 0 < value <= 2^64 range check
         // v < 2^64
@@ -233,7 +239,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let secret_k_hash = sponge::gadget(composer, &[secret_k.var]);
         // Add PI constraint for the secret_k_hash.
         pi.push(PublicInput::BlsScalar(
-            -bid.hashed_secret,
+            -bid.hashed_secret(),
             composer.circuit_size(),
         ));
 
@@ -242,7 +248,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         composer.constrain_to_constant(
             secret_k_hash,
             BlsScalar::zero(),
-            -bid.hashed_secret,
+            -bid.hashed_secret(),
         );
 
         // We generate the prover_id and constrain it to a public input
@@ -281,9 +287,8 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         );
 
         // 9. Score generation circuit check with the corresponding gadget.
-        let computed_score = prove_correct_score_gadget(
+        let computed_score = score.prove_correct_score_gadget(
             composer,
-            score,
             bid_value,
             secret_k,
             bid_tree_root,
@@ -295,13 +300,13 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // Constraint the score to be the public one and set it in the PI
         // constructor.
         pi.push(PublicInput::BlsScalar(
-            -score.score,
+            -score.value(),
             composer.circuit_size(),
         ));
         composer.constrain_to_constant(
             computed_score,
             BlsScalar::zero(),
-            -score.score,
+            -score.value(),
         );
         Ok(())
     }

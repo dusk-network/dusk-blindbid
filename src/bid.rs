@@ -6,11 +6,16 @@
 
 //! Bid data structure
 
+pub(crate) mod encoding;
+pub(crate) mod score;
 use crate::errors::BlindBidError;
+
 #[cfg(feature = "canon")]
 use canonical::Canon;
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
+
+use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
 use dusk_jubjub::{
@@ -20,26 +25,33 @@ use dusk_pki::{Ownable, StealthAddress};
 use poseidon252::cipher::PoseidonCipher;
 use poseidon252::sponge;
 use rand_core::{CryptoRng, RngCore};
+pub use score::Score;
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
-    // b_enc (encrypted value and blinder)
-    pub encrypted_data: PoseidonCipher,
-    // Nonce used by the cypher
-    pub nonce: BlsScalar,
-    // Stealth address of the bidder
-    pub stealth_address: StealthAddress,
-    // m
-    pub hashed_secret: BlsScalar,
-    // c (Pedersen Commitment)
-    pub c: JubJubAffine,
-    // Elegibility timestamp
-    pub eligibility: u64,
-    // Expiration timestamp
-    pub expiration: u64,
-    // Position of the Bid in the BidTree
-    pub pos: u64,
+    /// Encrypted value and blinder.
+    encrypted_data: PoseidonCipher,
+    /// Nonce used by the cypher.
+    nonce: BlsScalar,
+    /// Stealth address of the bidder.
+    stealth_address: StealthAddress,
+    /// Hashed secret
+    pub(crate) hashed_secret: BlsScalar,
+    /// Commitment containing value & blinder fields hidden.
+    pub(crate) c: JubJubAffine,
+    /// Elegibility height
+    pub(crate) eligibility: u64,
+    /// Expiration height
+    pub(crate) expiration: u64,
+    /// Position of the Bid in the Tree where it is stored.
+    pub(crate) pos: u64,
+}
+
+impl Borrow<u64> for Bid {
+    fn borrow(&self) -> &u64 {
+        &self.pos
+    }
 }
 
 impl Ownable for Bid {
@@ -53,6 +65,8 @@ impl PartialEq for Bid {
         self.hash().eq(&other.hash())
     }
 }
+
+impl Eq for Bid {}
 
 // This needs to be between braces since const fn calls passed as const_generics
 // params aren't perfectly supported yet.
@@ -112,8 +126,6 @@ impl
     }
 }
 
-impl Eq for Bid {}
-
 impl Bid {
     /// Generates a new [Bid](self::Bid) from a rng source plus it's fields.  
     pub fn new<R>(
@@ -164,6 +176,47 @@ impl Bid {
         bid.set_value(rng, value, secret);
 
         Ok(bid)
+    }
+
+    /// Returns the `encrypted_data` field of the [Bid](self::Bid).
+    pub fn encrypted_data(&self) -> PoseidonCipher {
+        self.encrypted_data
+    }
+
+    /// Returns the `nonce` field of the [Bid](self::Bid).
+    pub fn nonce(&self) -> BlsScalar {
+        self.nonce
+    }
+
+    /// Returns the `hashed_secret` field of the [Bid](self::Bid).
+    pub fn hashed_secret(&self) -> BlsScalar {
+        self.hashed_secret
+    }
+
+    /// Returns the `commitment` field of the [Bid](self::Bid).
+    pub fn commitment(&self) -> JubJubAffine {
+        self.c
+    }
+
+    /// Returns the `eligibility` field of the [Bid](self::Bid).
+    pub fn eligibility(&self) -> u64 {
+        self.eligibility
+    }
+
+    /// Returns the `expiration` field of the [Bid](self::Bid).
+    pub fn expiration(&self) -> u64 {
+        self.expiration
+    }
+
+    /// Returns the `pos` field of the [Bid](self::Bid).
+    pub fn pos(&self) -> u64 {
+        self.pos
+    }
+
+    /// Returns a mutable ref pointing to the `pos` field of the
+    /// [Bid](self::Bid).
+    pub fn set_pos(&mut self) -> &mut u64 {
+        &mut self.pos
     }
 
     /// One-time prover-id is stated to be `H(secret_k, sigma^s, k^t, k^s)`.
@@ -227,5 +280,52 @@ impl Bid {
             &(GENERATOR_EXTENDED * value)
                 + &(GENERATOR_NUMS_EXTENDED * blinder),
         );
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg(test)]
+mod bid_serialization {
+    use super::*;
+    use crate::{V_RAW_MAX, V_RAW_MIN};
+    use dusk_pki::{PublicSpendKey, SecretSpendKey};
+    use rand::Rng;
+
+    #[test]
+    fn bid_serialization_roundtrip() {
+        let bid = {
+            let mut rng = rand::thread_rng();
+            let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+                JubJubScalar::one(),
+                -JubJubScalar::one(),
+            ));
+            let secret_k = BlsScalar::one();
+            let secret = JubJubScalar::one();
+            let stealth_addr = pk_r.gen_stealth_address(&secret);
+            let secret = GENERATOR_EXTENDED * secret;
+            let value: u64 =
+                (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
+            let value = JubJubScalar::from(value);
+            // Set the timestamps as the max values so the proofs do not fail
+            // for them (never expired or non-elegible).
+            let elegibility_ts = u64::MAX;
+            let expiration_ts = u64::MAX;
+
+            Bid::new(
+                &mut rng,
+                &stealth_addr,
+                &value,
+                &secret.into(),
+                secret_k,
+                elegibility_ts,
+                expiration_ts,
+            )
+            .expect("Bid creation error")
+        };
+
+        let bid_bytes = bid.to_bytes();
+        let bid_from_bytes =
+            Bid::from_bytes(&bid_bytes).expect("Invalid roundtrip");
+        assert_eq!(bid, bid_from_bytes)
     }
 }

@@ -5,21 +5,16 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
-#![cfg(feature = "canon")]
-#![cfg(feature = "std")]
 
-mod tree_assets;
+use super::tree_assets::BidTree;
+use crate::{Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN};
 use anyhow::Result;
 use canonical_host::MemStore;
-use dusk_blindbid::proof::BlindBidCircuit;
-use dusk_blindbid::{bid::Bid, score_gen::Score};
-use dusk_blindbid::{V_RAW_MAX, V_RAW_MIN};
 use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
 use rand::Rng;
-use tree_assets::BidTree;
 
 fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     let mut rng = rand::thread_rng();
@@ -51,7 +46,6 @@ fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
-
     #[test]
     fn correct_blindbid_proof() -> Result<()> {
         // Generate Composer & Public Parameters
@@ -80,16 +74,16 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = bid
-            .compute_score(
-                &secret,
-                secret_k,
-                *branch.root(),
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let score = Score::compute_score(
+            &bid,
+            &secret,
+            secret_k,
+            *branch.root(),
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         let prover_id = bid.generate_prover_id(
             secret_k,
@@ -119,10 +113,10 @@ mod protocol_tests {
         let pi = vec![
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
-            PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::AffinePoint(bid.commitment(), 0, 0),
+            PublicInput::BlsScalar(bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
-            PublicInput::BlsScalar(score.score, 0),
+            PublicInput::BlsScalar(score.value(), 0),
         ];
 
         let mut circuit = BlindBidCircuit {
@@ -168,20 +162,20 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let mut score = bid
-            .compute_score(
-                &secret,
-                secret_k,
-                *branch.root(),
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let mut score = Score::compute_score(
+            &bid,
+            &secret,
+            secret_k,
+            *branch.root(),
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         // Edit the Score so that we try to get a bigger one than the one we
         // should have got.
-        score.score = score.score + BlsScalar::from(100u64);
+        score.value = score.value() + BlsScalar::from(100u64);
         let prover_id = bid.generate_prover_id(
             secret_k,
             BlsScalar::from(consensus_round_seed),
@@ -212,9 +206,9 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
-            PublicInput::BlsScalar(score.score, 0),
+            PublicInput::BlsScalar(score.value(), 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"BidWithEditedScore", &proof, &pi)
@@ -251,16 +245,16 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = bid
-            .compute_score(
-                &secret,
-                secret_k,
-                bid_tree_root,
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let score = Score::compute_score(
+            &bid,
+            &secret,
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         let prover_id = bid.generate_prover_id(
             secret_k,
@@ -294,9 +288,9 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
-            PublicInput::BlsScalar(score.score, 0),
+            PublicInput::BlsScalar(score.value(), 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"EditedBidValue", &proof, &pi)
@@ -351,16 +345,16 @@ mod protocol_tests {
         let consensus_round_seed = 25519u64;
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = bid
-            .compute_score(
-                &secret,
-                secret_k,
-                *branch.root(),
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let score = Score::compute_score(
+            &bid,
+            &secret,
+            secret_k,
+            *branch.root(),
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         // Latest consensus step should be lower than the expiration_ts, in this
         // case is not so the proof should fail since the Bid is expired
@@ -396,9 +390,9 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
-            PublicInput::BlsScalar(score.score, 0),
+            PublicInput::BlsScalar(score.value(), 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"ExpiredBid", &proof, &pi)
@@ -454,16 +448,16 @@ mod protocol_tests {
         let consensus_round_seed = 25519u64;
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = bid
-            .compute_score(
-                &secret,
-                secret_k,
-                *branch.root(),
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let score = Score::compute_score(
+            &bid,
+            &secret,
+            secret_k,
+            *branch.root(),
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         let prover_id = bid.generate_prover_id(
             secret_k,
@@ -499,9 +493,9 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret, 0),
+            PublicInput::BlsScalar(bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
-            PublicInput::BlsScalar(score.score, 0),
+            PublicInput::BlsScalar(score.value(), 0),
         ];
         assert!(circuit
             .verify_proof(&pub_params, &vk, b"NonElegibleBid", &proof, &pi)
@@ -515,8 +509,7 @@ mod serialization_tests {
     use super::*;
     use core::result::Result;
     #[test]
-    fn from_to_bytes_impl_works(
-    ) -> Result<(), dusk_blindbid::errors::BlindBidError> {
+    fn from_to_bytes_impl_works() -> Result<(), BlindBidError> {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());
         let bid_hash = bid.hash();
         let bytes = bid.to_bytes();
