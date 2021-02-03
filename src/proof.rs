@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! BlindBidProof module.
+
 use crate::bid::score::Score;
 use crate::bid::{encoding::preimage_gadget, Bid};
 use anyhow::Result;
@@ -20,6 +21,10 @@ use poseidon252::{
     sponge,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
+#[cfg(test)]
+mod bid_tests;
+#[cfg(test)]
+mod tree_assets;
 
 #[derive(Debug, Clone)]
 pub struct BlindBidCircuit<'a> {

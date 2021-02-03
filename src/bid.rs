@@ -13,6 +13,7 @@ use crate::errors::BlindBidError;
 use canonical::Canon;
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
+use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
 use dusk_jubjub::{
@@ -34,15 +35,21 @@ pub struct Bid {
     /// Stealth address of the bidder.
     stealth_address: StealthAddress,
     /// Hashed secret
-    hashed_secret: BlsScalar,
+    pub(crate) hashed_secret: BlsScalar,
     /// Commitment containing value & blinder fields hidden.
-    c: JubJubAffine,
+    pub(crate) c: JubJubAffine,
     /// Elegibility height
-    eligibility: u64,
+    pub(crate) eligibility: u64,
     /// Expiration height
-    expiration: u64,
+    pub(crate) expiration: u64,
     /// Position of the Bid in the Tree where it is stored.
-    pos: u64,
+    pub(crate) pos: u64,
+}
+
+impl Borrow<u64> for Bid {
+    fn borrow(&self) -> &u64 {
+        &self.pos
+    }
 }
 
 impl Ownable for Bid {

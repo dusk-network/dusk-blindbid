@@ -41,7 +41,7 @@ use poseidon252::sponge;
 /// are side-results of this computation needed to proof the correctness of the
 /// Score generation process later on.
 pub struct Score {
-    value: BlsScalar,
+    pub(crate) value: BlsScalar,
     y: BlsScalar,
     y_prime: BlsScalar,
     r1: BlsScalar,
