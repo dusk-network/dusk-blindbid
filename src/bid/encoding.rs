@@ -100,7 +100,6 @@ impl Into<BlsScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon252 hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
-#[allow(dead_code)]
 #[cfg(feature = "std")]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,

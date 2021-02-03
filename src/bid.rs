@@ -6,6 +6,8 @@
 
 //! Bid data structure
 
+pub(crate) mod encoding;
+pub(crate) mod score;
 use crate::errors::BlindBidError;
 #[cfg(feature = "canon")]
 use canonical::Canon;
@@ -20,26 +22,27 @@ use dusk_pki::{Ownable, StealthAddress};
 use poseidon252::cipher::PoseidonCipher;
 use poseidon252::sponge;
 use rand_core::{CryptoRng, RngCore};
+pub use score::Score;
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
-    // b_enc (encrypted value and blinder)
-    pub encrypted_data: PoseidonCipher,
-    // Nonce used by the cypher
-    pub nonce: BlsScalar,
-    // Stealth address of the bidder
-    pub stealth_address: StealthAddress,
-    // m
-    pub hashed_secret: BlsScalar,
-    // c (Pedersen Commitment)
-    pub c: JubJubAffine,
-    // Elegibility timestamp
-    pub eligibility: u64,
-    // Expiration timestamp
-    pub expiration: u64,
-    // Position of the Bid in the BidTree
-    pub pos: u64,
+    /// Encrypted value and blinder.
+    encrypted_data: PoseidonCipher,
+    /// Nonce used by the cypher.
+    nonce: BlsScalar,
+    /// Stealth address of the bidder.
+    stealth_address: StealthAddress,
+    /// Hashed secret
+    hashed_secret: BlsScalar,
+    /// Commitment containing value & blinder fields hidden.
+    c: JubJubAffine,
+    /// Elegibility height
+    eligibility: u64,
+    /// Expiration height
+    expiration: u64,
+    /// Position of the Bid in the Tree where it is stored.
+    pos: u64,
 }
 
 impl Ownable for Bid {
@@ -53,6 +56,8 @@ impl PartialEq for Bid {
         self.hash().eq(&other.hash())
     }
 }
+
+impl Eq for Bid {}
 
 // This needs to be between braces since const fn calls passed as const_generics
 // params aren't perfectly supported yet.
@@ -112,8 +117,6 @@ impl
     }
 }
 
-impl Eq for Bid {}
-
 impl Bid {
     /// Generates a new [Bid](self::Bid) from a rng source plus it's fields.  
     pub fn new<R>(
@@ -164,6 +167,53 @@ impl Bid {
         bid.set_value(rng, value, secret);
 
         Ok(bid)
+    }
+
+    /// Returns the `encrypted_data` field of the [Bid](self::Bid).
+    pub fn encrypted_data(&self) -> PoseidonCipher {
+        self.encrypted_data
+    }
+
+    /// Returns the `nonce` field of the [Bid](self::Bid).
+    pub fn nonce(&self) -> BlsScalar {
+        self.nonce
+    }
+
+    /// Returns a mutable ref pointing to the `nonce` field of the
+    /// [Bid](self::Bid).
+    pub fn nonce_mut(&mut self) -> &mut BlsScalar {
+        &mut self.nonce
+    }
+
+    /// Returns the `hashed_secret` field of the [Bid](self::Bid).
+    pub fn hashed_secret(&self) -> BlsScalar {
+        self.hashed_secret
+    }
+
+    /// Returns the `commitment` field of the [Bid](self::Bid).
+    pub fn commitment(&self) -> JubJubAffine {
+        self.c
+    }
+
+    /// Returns the `eligibility` field of the [Bid](self::Bid).
+    pub fn eligibility(&self) -> u64 {
+        self.eligibility
+    }
+
+    /// Returns the `expiration` field of the [Bid](self::Bid).
+    pub fn expiration(&self) -> u64 {
+        self.expiration
+    }
+
+    /// Returns the `pos` field of the [Bid](self::Bid).
+    pub fn pos(&self) -> u64 {
+        self.pos
+    }
+
+    /// Returns a mutable ref pointing to the `pos` field of the
+    /// [Bid](self::Bid).
+    pub fn pos_mut(&mut self) -> &mut u64 {
+        &mut self.pos
     }
 
     /// One-time prover-id is stated to be `H(secret_k, sigma^s, k^t, k^s)`.

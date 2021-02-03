@@ -12,7 +12,6 @@ pub mod bid;
 pub mod errors;
 #[cfg(feature = "std")]
 pub mod proof;
-pub mod score_gen;
 #[cfg(all(feature = "std", feature = "canon"))]
 pub use proof::BlindBidCircuit;
 
