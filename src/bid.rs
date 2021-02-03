@@ -9,11 +9,12 @@
 pub(crate) mod encoding;
 pub(crate) mod score;
 use crate::errors::BlindBidError;
-cfg_if::cfg_if! {
-    if #[cfg(feature = "canon")] {
-        use canonical::Canon;use canonical_derive::Canon;
-    }
-}
+
+#[cfg(feature = "canon")]
+use canonical::Canon;
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
+
 use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
