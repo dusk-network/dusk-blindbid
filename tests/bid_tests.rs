@@ -11,10 +11,9 @@
 mod tree_assets;
 use anyhow::Result;
 use canonical_host::MemStore;
-use dusk_blindbid::proof::BlindBidCircuit;
-use dusk_blindbid::{bid::Bid, score_gen::Score};
-use dusk_blindbid::{V_RAW_MAX, V_RAW_MIN};
-use dusk_bytes::Serializable;
+use dusk_blindbid::{
+    Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN,
+};
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
@@ -51,7 +50,7 @@ fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
-
+    use dusk_bytes::Serializable;
     #[test]
     fn correct_blindbid_proof() -> Result<()> {
         // Generate Composer & Public Parameters
@@ -515,8 +514,7 @@ mod serialization_tests {
     use super::*;
     use core::result::Result;
     #[test]
-    fn from_to_bytes_impl_works(
-    ) -> Result<(), dusk_blindbid::errors::BlindBidError> {
+    fn from_to_bytes_impl_works() -> Result<(), BlindBidError> {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());
         let bid_hash = bid.hash();
         let bytes = bid.to_bytes();

@@ -484,16 +484,16 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let score = bid
-            .compute_score(
-                &secret.into(),
-                secret_k,
-                bid_tree_root,
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score computation error");
+        let score = Score::compute_score(
+            &bid,
+            &secret.into(),
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score computation error");
 
         // Proving
         let mut prover = Prover::new(b"testing");
@@ -514,9 +514,8 @@ mod tests {
             BlsScalar::from(latest_consensus_round),
             BlsScalar::from(latest_consensus_step),
         );
-        prove_correct_score_gadget(
+        score.prove_correct_score_gadget(
             prover.mut_cs(),
-            score,
             alloc_value,
             alloc_secret_k,
             alloc_bid_tree_root,
@@ -546,9 +545,8 @@ mod tests {
             BlsScalar::from(latest_consensus_round),
             BlsScalar::from(latest_consensus_step),
         );
-        prove_correct_score_gadget(
+        score.prove_correct_score_gadget(
             verifier.mut_cs(),
-            score,
             alloc_value,
             alloc_secret_k,
             alloc_bid_tree_root,
@@ -585,17 +583,17 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let mut score = bid
-            .compute_score(
-                &secret.into(),
-                secret_k,
-                bid_tree_root,
-                consensus_round_seed,
-                latest_consensus_round,
-                latest_consensus_step,
-            )
-            .expect("Score Computation error");
-        score.score = BlsScalar::from(5686536568u64);
+        let mut score = Score::compute_score(
+            &bid,
+            &secret.into(),
+            secret_k,
+            bid_tree_root,
+            consensus_round_seed,
+            latest_consensus_round,
+            latest_consensus_step,
+        )
+        .expect("Score Computation error");
+        score.value = BlsScalar::from(5686536568u64);
         score.r1 = BlsScalar::from(5898956968u64);
 
         // Proving
@@ -617,9 +615,8 @@ mod tests {
             BlsScalar::from(latest_consensus_round),
             BlsScalar::from(latest_consensus_step),
         );
-        prove_correct_score_gadget(
+        score.prove_correct_score_gadget(
             prover.mut_cs(),
-            score,
             alloc_value,
             alloc_secret_k,
             alloc_bid_tree_root,
@@ -649,9 +646,8 @@ mod tests {
             BlsScalar::from(latest_consensus_round),
             BlsScalar::from(latest_consensus_step),
         );
-        prove_correct_score_gadget(
+        score.prove_correct_score_gadget(
             verifier.mut_cs(),
-            score,
             alloc_value,
             alloc_secret_k,
             alloc_bid_tree_root,
@@ -665,5 +661,26 @@ mod tests {
             .is_err());
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod score_serialization {
+    use super::*;
+
+    #[test]
+    fn score_serialization_roundtrip() {
+        let score = Score {
+            value: BlsScalar::one(),
+            y: BlsScalar::one(),
+            y_prime: BlsScalar::one(),
+            r1: BlsScalar::one(),
+            r2: BlsScalar::one(),
+        };
+
+        let score_bytes = score.to_bytes();
+        let score_from_bytes =
+            Score::from_bytes(&score_bytes).expect("Invalid roundtrip");
+        assert_eq!(score, score_from_bytes)
     }
 }

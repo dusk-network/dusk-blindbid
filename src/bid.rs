@@ -279,3 +279,50 @@ impl Bid {
         );
     }
 }
+
+#[cfg(feature = "std")]
+#[cfg(test)]
+mod bid_serialization {
+    use super::*;
+    use crate::{V_RAW_MAX, V_RAW_MIN};
+    use dusk_pki::{PublicSpendKey, SecretSpendKey};
+    use rand::Rng;
+
+    #[test]
+    fn bid_serialization_roundtrip() {
+        let bid = {
+            let mut rng = rand::thread_rng();
+            let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+                JubJubScalar::one(),
+                -JubJubScalar::one(),
+            ));
+            let secret_k = BlsScalar::one();
+            let secret = JubJubScalar::one();
+            let stealth_addr = pk_r.gen_stealth_address(&secret);
+            let secret = GENERATOR_EXTENDED * secret;
+            let value: u64 =
+                (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
+            let value = JubJubScalar::from(value);
+            // Set the timestamps as the max values so the proofs do not fail
+            // for them (never expired or non-elegible).
+            let elegibility_ts = u64::MAX;
+            let expiration_ts = u64::MAX;
+
+            Bid::new(
+                &mut rng,
+                &stealth_addr,
+                &value,
+                &secret.into(),
+                secret_k,
+                elegibility_ts,
+                expiration_ts,
+            )
+            .expect("Bid creation error")
+        };
+
+        let bid_bytes = bid.to_bytes();
+        let bid_from_bytes =
+            Bid::from_bytes(&bid_bytes).expect("Invalid roundtrip");
+        assert_eq!(bid, bid_from_bytes)
+    }
+}
