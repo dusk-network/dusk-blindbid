@@ -8,6 +8,8 @@
 //! ![GitHub](https://img.shields.io/github/license/dusk-network/dusk-blindbid)
 //! ![Crates.io](https://img.shields.io/crates/v/dusk-blindbid)
 //!
+//! # Rationale & Theory
+//!
 //! In order to participate in the SBA consensus, Block generators have to
 //! submit a bid in DUSK. As long as their bid is active - and their full-node
 //! is connected with the internet and running- they are participating in the
@@ -98,9 +100,29 @@
 //! _**minimum score threshold**_. If it is indeed greater, then the Block
 //! Generator generates the aforementioned proofs and propagates the score
 //! obtained, the zero-knowledge proof computed and various other elements
-//! alongside the Block Candidate to his peers in the network. The Block
-//! Generator that computed the highest score is considered to be the leader of
-//! the current iteration of the consensus.
+//! alongside the Block Candidate to his peers in the network.
+//! The Block Generator that computed the highest score is considered to be the
+//! leader of the current iteration of the consensus.
+//!
+//! # Documentation
+//! The best usage example of this library can actually be found in the Bid
+//! contract. This is the place where this lib provides all it's
+//! functionallities together with PoseidonTrees and Zero Knowledge Proofs.
+//! See: https://github.com/dusk-network/rusk/tree/master/contracts/bid for more info and detail.
+//!
+//! You can also check the documentation of this crate [here](https://docs.rs/dusk-blindbid/0.5.0/).
+//!
+//! # Licensing
+//! This code is licensed under Mozilla Public License Version 2.0 (MPL-2.0).
+//! Please see [LICENSE](https://github.com/dusk-network/dusk-blindbid/blob/master/LICENSE) for further info.
+//!
+//! # About
+//! Protocol & Implementation designed by the [dusk](https://dusk.network) team.
+//!
+//! # Contributing
+//! - If you want to contribute to this repository/project please, check [CONTRIBUTING.md](https://github.com/dusk-network/dusk-blindbid/blob/master/CONTRIBUTING.md)
+//! - If you want to report a bug or request a new feature addition, please open
+//!   an issue on this repository.
 
 #![allow(non_snake_case)]
 #![cfg_attr(not(feature = "std"), no_std)]
