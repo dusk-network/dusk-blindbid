@@ -12,7 +12,7 @@ use dusk_jubjub::JubJubScalar;
 use std::fmt;
 
 #[derive(Debug)]
-/// Definition of the erros that Bid operations might have.
+/// Compilation of the erros that blindbid procedures might end up producing.
 pub enum BlindBidError {
     /// Error for the cases when we the score results are too large to
     /// fit inside a `Scalar`.
