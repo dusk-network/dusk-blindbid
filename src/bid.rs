@@ -84,20 +84,15 @@ impl
     type Error = dusk_bytes::Error;
 
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Bid, Self::Error> {
-        let mut one_u64 = [0u8; 8];
-        let encrypted_data =
-            PoseidonCipher::from_slice(&buf[0..PoseidonCipher::SIZE])?;
-        let nonce = BlsScalar::from_slice(&buf[PoseidonCipher::SIZE..128])?;
-        let stealth_address = StealthAddress::from_slice(&buf[128..192])?;
-        let hashed_secret = BlsScalar::from_slice(&buf[192..224])?;
-        let c = JubJubAffine::from_slice(&buf[224..256])?;
-        // TODO: Change once https://github.com/dusk-network/dusk-bytes/issues/12 is addressed.
-        one_u64[..].copy_from_slice(&buf[256..264]);
-        let eligibility = u64::from_le_bytes(one_u64);
-        one_u64[..].copy_from_slice(&buf[264..272]);
-        let expiration = u64::from_le_bytes(one_u64);
-        one_u64[..].copy_from_slice(&buf[272..Self::SIZE]);
-        let pos = u64::from_le_bytes(one_u64);
+        let mut buffer = &buf[..];
+        let encrypted_data = PoseidonCipher::from_reader(&mut buffer)?;
+        let nonce = BlsScalar::from_reader(&mut buffer)?;
+        let stealth_address = StealthAddress::from_reader(&mut buffer)?;
+        let hashed_secret = BlsScalar::from_reader(&mut buffer)?;
+        let c = JubJubAffine::from_reader(&mut buffer)?;
+        let eligibility = u64::from_reader(&mut buffer)?;
+        let expiration = u64::from_reader(&mut buffer)?;
+        let pos = u64::from_reader(&mut buffer)?;
 
         Ok(Bid {
             encrypted_data,
@@ -111,17 +106,20 @@ impl
         })
     }
 
+    #[allow(unused_must_use)]
     fn to_bytes(&self) -> [u8; Self::SIZE] {
+        use dusk_bytes::Write;
+
         let mut buf = [0u8; Self::SIZE];
-        buf[0..PoseidonCipher::SIZE]
-            .copy_from_slice(&self.encrypted_data.to_bytes());
-        buf[PoseidonCipher::SIZE..128].copy_from_slice(&self.nonce.to_bytes());
-        buf[128..192].copy_from_slice(&self.stealth_address.to_bytes());
-        buf[192..224].copy_from_slice(&self.hashed_secret.to_bytes());
-        buf[224..256].copy_from_slice(&self.c.to_bytes());
-        buf[256..264].copy_from_slice(&self.eligibility.to_le_bytes());
-        buf[264..272].copy_from_slice(&self.expiration.to_le_bytes());
-        buf[272..Self::SIZE].copy_from_slice(&self.pos.to_le_bytes());
+        let mut writer = &mut buf[..];
+        writer.write(&self.encrypted_data.to_bytes());
+        writer.write(&self.nonce.to_bytes());
+        writer.write(&self.stealth_address.to_bytes());
+        writer.write(&self.hashed_secret.to_bytes());
+        writer.write(&self.c.to_bytes());
+        writer.write(&self.eligibility.to_bytes());
+        writer.write(&self.expiration.to_bytes());
+        writer.write(&self.pos.to_bytes());
         buf
     }
 }
