@@ -62,17 +62,17 @@ impl AsRef<BlsScalar> for Score {
 impl Serializable<{ 5 * BlsScalar::SIZE }> for Score {
     type Error = dusk_bytes::Error;
 
+    #[allow(unused_must_use)]
     fn to_bytes(&self) -> [u8; Self::SIZE] {
+        use dusk_bytes::Write;
+
         let mut buf = [0u8; Self::SIZE];
-        buf[0..BlsScalar::SIZE].copy_from_slice(&self.as_ref().to_bytes());
-        buf[BlsScalar::SIZE..BlsScalar::SIZE * 2]
-            .copy_from_slice(&self.as_ref().to_bytes());
-        buf[BlsScalar::SIZE * 2..BlsScalar::SIZE * 3]
-            .copy_from_slice(&self.as_ref().to_bytes());
-        buf[BlsScalar::SIZE * 3..BlsScalar::SIZE * 4]
-            .copy_from_slice(&self.as_ref().to_bytes());
-        buf[BlsScalar::SIZE * 4..Self::SIZE]
-            .copy_from_slice(&self.as_ref().to_bytes());
+        let mut writer = &mut buf[..];
+        writer.write(&self.as_ref().to_bytes());
+        writer.write(&self.as_ref().to_bytes());
+        writer.write(&self.as_ref().to_bytes());
+        writer.write(&self.as_ref().to_bytes());
+        writer.write(&self.as_ref().to_bytes());
         buf
     }
 
