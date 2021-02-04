@@ -52,7 +52,8 @@ pub use score::Score;
 /// [PoseidonLeaf](poseidon252::tree::PoseidonLeaf) trait for it or a wrapper
 /// structure.
 /// # Example
-/// ```
+/// ```ignore
+/// // This example only works wit `std` and `canon` features activated.
 /// use dusk_pki::{PublicSpendKey, SecretSpendKey};
 /// use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 /// use dusk_plonk::prelude::*;
@@ -71,9 +72,9 @@ pub use score::Score;
 /// // Generate the amount of Dusk we want to bid.
 /// let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
 /// let value = JubJubScalar::from(value);
-/// // Set the correct consensus parameters. NOTE that the Bid is usually created inside
-/// // the Bid Contract. And therefore some of this info might be unavaliable outside.
-/// let elegibility_ts = u64::MAX;
+/// // Set the correct consensus parameters. NOTE that the Bid is usually
+/// // created inside the Bid Contract. And therefore some of this info might be
+/// unavaliable outside. let elegibility_ts = u64::MAX;
 /// let expiration_ts = u64::MAX;
 /// Bid::new(
 ///     &mut rng,

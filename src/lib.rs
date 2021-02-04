@@ -108,7 +108,7 @@
 //! The best usage example of this library can actually be found in the Bid
 //! contract. This is the place where this lib provides all it's
 //! functionallities together with PoseidonTrees and Zero Knowledge Proofs.
-//! See: https://github.com/dusk-network/rusk/tree/master/contracts/bid for more info and detail.
+//! See: <https://github.com/dusk-network/rusk/tree/master/contracts/bid for more info and detail.>
 //!
 //! You can also check the documentation of this crate [here](https://docs.rs/dusk-blindbid/0.5.0/).
 //!
@@ -142,9 +142,9 @@ pub use errors::BlindBidError;
 #[cfg(all(feature = "std", feature = "canon"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "canon", feature = "std"))))]
 pub use proof::BlindBidCircuit;
-/// The minimum amount user is permitted to bid.
+/// The minimum amount of Dusk an user is permitted to bid.
 pub const V_RAW_MIN: u64 = 50_000u64;
-/// The maximum amount user is permitted to bid.
+/// The maximum amount of Dusk an user is permitted to bid.
 pub const V_RAW_MAX: u64 = 250_000u64;
 
 use dusk_jubjub::JubJubScalar;

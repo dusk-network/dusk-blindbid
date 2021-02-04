@@ -1,2 +1,2 @@
 [build]
-rustdocflags = ["--cfg", "docsrs"]
+rustdocflags = ["--cfg", "docsrs", "-Z", "unstable-options"]
