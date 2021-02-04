@@ -4,6 +4,10 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
+//! ![GitHub branch checks state](https://img.shields.io/github/checks-status/dusk-network/dusk-blindbid/master)
+//! ![GitHub](https://img.shields.io/github/license/dusk-network/dusk-blindbid)
+//! ![Crates.io](https://img.shields.io/crates/v/dusk-blindbid)
+//!
 //! In order to participate in the SBA consensus, Block generators have to
 //! submit a bid in DUSK. As long as their bid is active - and their full-node
 //! is connected with the internet and running- they are participating in the
@@ -12,6 +16,8 @@
 //! executes various steps in order to generate a valid candidate block, and
 //! compete with the other Block Generators for a chance to become the winner of
 //! the consensus round.
+//!
+//! ![](https://public.bnbstatic.com/static/research/static/images/projects/dusk-network/image18.png)
 //!
 //! Below we describe the three main processes that happen
 //! every consensus round. Please note that 1 and 2 are run as part of the same
@@ -98,6 +104,12 @@
 
 #![allow(non_snake_case)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc(
+    html_logo_url = "https://lh3.googleusercontent.com/SmwswGxtgIANTbDrCOn5EKcRBnVdHjmYsHYxLq2HZNXWCQ9-fZyaea-bNgdX9eR0XGSqiMFi=w128-h128-e365",
+    html_favicon_url = "https://dusk.network/lib/img/favicon-16x16.png",
+    html_root_url = "https://docs.rs/dusk-blindbid/0.0.0"
+)]
 
 pub(crate) mod bid;
 pub(crate) mod errors;
@@ -106,6 +118,7 @@ pub(crate) mod proof;
 pub use bid::{Bid, Score};
 pub use errors::BlindBidError;
 #[cfg(all(feature = "std", feature = "canon"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "canon", feature = "std"))))]
 pub use proof::BlindBidCircuit;
 /// The minimum amount user is permitted to bid.
 pub const V_RAW_MIN: u64 = 50_000u64;

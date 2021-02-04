@@ -101,6 +101,7 @@ impl Into<BlsScalar> for Bid {
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.

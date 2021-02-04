@@ -119,6 +119,7 @@ mod tree_assets;
 /// };
 /// circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
 /// ```
+#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "canon"))))]
 #[derive(Debug, Clone)]
 pub struct BlindBidCircuit<'a> {
     /// Bid used to generate the score
