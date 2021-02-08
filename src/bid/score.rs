@@ -118,6 +118,7 @@ pub(self) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
 #[cfg(feature = "std")]
 impl Score {
     /// Given a `Bid`, compute it's Score and return it.
+    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
     pub fn compute_score(
         bid: &Bid,
         secret: &JubJubAffine,
@@ -181,6 +182,7 @@ impl Score {
 
     /// Proves that a `Score` is correctly generated.
     /// Prints the proving statements in the passed Constraint System.
+    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
     pub fn prove_correct_score_gadget(
         &self,
         composer: &mut StandardComposer,

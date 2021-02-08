@@ -5,7 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 //! Encoding module for Bid structure.
-//! See: https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L
+//! See: <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>
 
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
@@ -101,6 +101,7 @@ impl Into<BlsScalar> for Bid {
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.

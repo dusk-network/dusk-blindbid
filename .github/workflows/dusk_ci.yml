@@ -71,7 +71,6 @@ jobs:
         with:
           command: test
           args: --release --no-default-features --features canon
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest

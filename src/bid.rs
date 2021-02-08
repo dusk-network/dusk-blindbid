@@ -4,8 +4,12 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Bid data structure
-
+//! The bid module contains all of the structures & logic that the bidder needs
+//! in order to participate in the bidding process inside the Dusk blockchain
+//! consensus. In particular, provides these core functionalities among others.
+//! - Generation of a prover ID.
+//! - Generation of a Score.
+//! - Generation of a Proof of BlindBid.
 pub(crate) mod encoding;
 pub(crate) mod score;
 use crate::errors::BlindBidError;
@@ -27,6 +31,74 @@ use poseidon252::sponge;
 use rand_core::{CryptoRng, RngCore};
 pub use score::Score;
 
+/// The Bid structure contains all of the logic and information needed to be
+/// able to participate in the Dusk consensus lottery through the bidding
+/// process. It allows the user to generate a random Bid with which will be able
+/// to generate a [`Score`] and participate in leader election
+/// process for this consensus round iteration. In particular, a Bid provides
+/// these core functionalities among others.
+/// - Generation of a prover ID.
+/// - Generation of a Score.
+/// - Generation of a Proof of BlindBid.
+///
+/// It is always initialized randomly, and any trick to cheat on it's
+/// initialization/construction will resume in a failure in the BindBidProof
+/// verification.
+///
+/// The Bid is also designed to be stored within a
+/// [PoseidonTree](poseidon252::tree::PoseidonTree). Although it's not
+/// responsability of this crate to provide such implementation. To make that
+/// happen, make sure to implement
+/// [PoseidonLeaf](poseidon252::tree::PoseidonLeaf) trait for it or a wrapper
+/// structure.
+/// # Example
+/// ```ignore
+/// // This example only works wit `std` and `canon` features activated.
+/// use dusk_pki::{PublicSpendKey, SecretSpendKey};
+/// use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
+/// use dusk_plonk::prelude::*;
+/// use rand::Rng;
+/// use dusk_blindbid::Bid;
+/// // Gen randomness source.
+/// let mut rng = rand::thread_rng();
+/// // Generate a PublicSpendKey from a SecretSpendKey.
+/// let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+///     JubJubScalar::one(),
+///     -JubJubScalar::one(),
+/// ));
+/// let stealth_addr = pk_r.gen_stealth_address(&secret);
+/// // Generate a secret to encrypt the value & blinder secret values.
+/// let secret = GENERATOR_EXTENDED * JubJubScalar::random(&mut rng);
+/// // Generate the amount of Dusk we want to bid.
+/// let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
+/// let value = JubJubScalar::from(value);
+/// // Set the correct consensus parameters. NOTE that the Bid is usually
+/// // created inside the Bid Contract. And therefore some of this info might be
+/// unavaliable outside. let elegibility_ts = u64::MAX;
+/// let expiration_ts = u64::MAX;
+/// Bid::new(
+///     &mut rng,
+///     &stealth_addr,
+///     &value,
+///     &secret.into(),
+///     secret_k,
+///     elegibility_ts,
+///     expiration_ts,
+/// )
+/// .expect("Bid creation error")
+///
+/// // Now with the Bid you can generate your Prover ID.
+/// // First set some consensus params as if we had them in the env.
+/// let consensus_round_seed = 2u64;
+/// let latest_consensus_round = 50u64;
+/// let latest_consensus_step = 50u64;
+/// let prover_id = bid.generate_prover_id(
+///     secret_k,
+///     BlsScalar::from(consensus_round_seed),
+///     BlsScalar::from(latest_consensus_round),
+///     BlsScalar::from(latest_consensus_step),
+/// );
+/// ```
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
@@ -125,7 +197,7 @@ impl
 }
 
 impl Bid {
-    /// Generates a new [Bid](self::Bid) from a rng source plus it's fields.  
+    /// Generates a new Bid from a rng source plus it's fields.  
     pub fn new<R>(
         rng: &mut R,
         stealth_address: &StealthAddress,
@@ -176,51 +248,54 @@ impl Bid {
         Ok(bid)
     }
 
-    /// Returns the `encrypted_data` field of the [Bid](self::Bid).
+    /// Returns the `encrypted_data` field of the Bid.
     pub fn encrypted_data(&self) -> PoseidonCipher {
         self.encrypted_data
     }
 
-    /// Returns the `nonce` field of the [Bid](self::Bid).
+    /// Returns the `nonce` field of the Bid.
     pub fn nonce(&self) -> BlsScalar {
         self.nonce
     }
 
-    /// Returns the `hashed_secret` field of the [Bid](self::Bid).
+    /// Returns the `hashed_secret` field of the Bid.
     pub fn hashed_secret(&self) -> BlsScalar {
         self.hashed_secret
     }
 
-    /// Returns the `commitment` field of the [Bid](self::Bid).
+    /// Returns the `commitment` field of the Bid.
     pub fn commitment(&self) -> JubJubAffine {
         self.c
     }
 
-    /// Returns the `eligibility` field of the [Bid](self::Bid).
+    /// Returns the `eligibility` field of the Bid.
     pub fn eligibility(&self) -> u64 {
         self.eligibility
     }
 
-    /// Returns the `expiration` field of the [Bid](self::Bid).
+    /// Returns the `expiration` field of the Bid.
     pub fn expiration(&self) -> u64 {
         self.expiration
     }
 
-    /// Returns the `pos` field of the [Bid](self::Bid).
+    /// Returns the `pos` field of the Bid.
     pub fn pos(&self) -> u64 {
         self.pos
     }
 
     /// Returns a mutable ref pointing to the `pos` field of the
-    /// [Bid](self::Bid).
+    /// Bid.
     pub fn set_pos(&mut self) -> &mut u64 {
         &mut self.pos
     }
 
-    /// One-time prover-id is stated to be `H(secret_k, sigma^s, k^t, k^s)`.
-    ///
-    /// The function performs the sponge_hash techniqe using poseidon to
-    /// get the one-time prover_id and sets it in the Bid.
+    /// Performs the [sponge_hash](sponge::hash) techniqe using poseidon to
+    /// compute the one-time prover_id that corresponds to a Bid in an specific
+    /// point of the consensus which is determinated by:
+    /// - consensus_round_seed (sigma^s)
+    /// - latest_consensus_round (k^t)
+    /// - latest_consensus_step (k^s)
+    /// One-time prover-id is stated to be `H(bid.secret_k, sigma^s, k^t, k^s)`.
     pub fn generate_prover_id(
         &self,
         secret_k: BlsScalar,
@@ -236,8 +311,10 @@ impl Bid {
         ])
     }
 
-    /// Decrypt the underlying data provided the secret of the bidder and return
-    /// a tuple containing the value and the blinder fields.
+    /// Provided the secret, decripts the data stored inside the
+    /// [cipher](PoseidonCipher) returning a tuple that contains
+    /// the value at stake in the bid and the blinder data which are the two
+    /// values used to generate the bid commitment.
     pub fn decrypt_data(
         &self,
         secret: &JubJubAffine,

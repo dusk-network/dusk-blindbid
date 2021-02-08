@@ -3,6 +3,19 @@ name = "dusk-blindbid"
 version = "0.5.0"
 authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
+license = "MPL-2.0"
+readme = "README.md"
+repository = "https://github.com/dusk-network/dusk-blindbid"
+categories =["algorithms", "cryptography", "science"]
+keywords = ["blindbid", "plonk", "lottery", "zero-knowledge", "crypto"]
+description = "BlindBid protocol implementation with PLONK ZKProofs backend"
+exclude = [
+    ".gitignore",
+    "Cargo.lock",
+    ".github/",
+    "README.md",
+    "CONTRIBUTING.md",
+]
 
 [dependencies]
 dusk-pki = {git = "https://github.com/dusk-network/dusk-pki", tag = "v0.5.1", default-features = false}
@@ -45,4 +58,3 @@ canon = [
     "poseidon252/canon",
     "dusk-pki/canon",
 ]
-
