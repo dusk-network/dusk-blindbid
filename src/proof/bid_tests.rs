@@ -61,7 +61,7 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k);
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = 2u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_round = 50u64;
         let latest_consensus_step = 50u64;
 
@@ -149,7 +149,7 @@ mod protocol_tests {
         let bid = random_bid(&secret, secret_k);
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = 1u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_round = 50u64;
         let latest_consensus_step = 50u64;
 
@@ -232,7 +232,7 @@ mod protocol_tests {
         let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
         // Generate fields for the Bid & required by the compute_score
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = 4u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         let latest_consensus_round = 25519u64;
         let latest_consensus_step = 25519u64;
 
@@ -342,7 +342,7 @@ mod protocol_tests {
         // the score generation would fail since the Bid would be expired.
         let latest_consensus_round = 3u64;
         let latest_consensus_step = 1u64;
-        let consensus_round_seed = 25519u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = Score::compute_score(
@@ -445,7 +445,7 @@ mod protocol_tests {
         // wouldn't be elegible.
         let latest_consensus_round = 3u64;
         let latest_consensus_step = 1u64;
-        let consensus_round_seed = 25519u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = Score::compute_score(
