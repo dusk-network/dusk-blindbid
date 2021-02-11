@@ -124,7 +124,7 @@ impl Score {
         secret: &JubJubAffine,
         secret_k: BlsScalar,
         bid_tree_root: BlsScalar,
-        consensus_round_seed: u64,
+        consensus_round_seed: BlsScalar,
         latest_consensus_round: u64,
         latest_consensus_step: u64,
     ) -> Result<Score, BlindBidError> {
@@ -132,7 +132,6 @@ impl Score {
             return Err(BlindBidError::ExpiredBid);
         };
 
-        let consensus_round_seed = BlsScalar::from(consensus_round_seed);
         let latest_consensus_round = BlsScalar::from(latest_consensus_round);
         let latest_consensus_step = BlsScalar::from(latest_consensus_step);
 
@@ -471,7 +470,7 @@ mod tests {
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = 3u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         // Set latest consensus round as the max value so the score gen does not
         // fail for that but for the proof verification error if that's
         // the case
@@ -570,7 +569,7 @@ mod tests {
         // Generate fields for the Bid & required by the compute_score
         let secret_k = BlsScalar::random(&mut rand::thread_rng());
         let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = 5u64;
+        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
         // Set the timestamps to the maximum possible value so the generation of
         // the score does not fail for that reason but for the proof
         // verification.
