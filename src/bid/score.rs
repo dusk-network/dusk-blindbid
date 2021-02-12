@@ -119,7 +119,7 @@ pub(self) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
 impl Score {
     /// Given a `Bid`, compute it's Score and return it.
     #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
-    pub fn compute_score(
+    pub fn compute(
         bid: &Bid,
         secret: &JubJubAffine,
         secret_k: BlsScalar,
@@ -478,7 +478,7 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let score = Score::compute_score(
+        let score = Score::compute(
             &bid,
             &secret.into(),
             secret_k,
@@ -577,7 +577,7 @@ mod tests {
         let latest_consensus_step = 2u64;
 
         // Edit score fields which should make the test fail
-        let mut score = Score::compute_score(
+        let mut score = Score::compute(
             &bid,
             &secret.into(),
             secret_k,
