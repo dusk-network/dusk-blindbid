@@ -14,7 +14,7 @@ use dusk_bytes::Serializable;
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
 #[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
-use poseidon252::sponge;
+use dusk_poseidon::sponge;
 
 // 1. Generate the type_fields Scalar Id:
 // Type 1 will be BlsScalar
@@ -97,7 +97,7 @@ impl Into<BlsScalar> for Bid {
     }
 }
 
-/// Hashes the internal Bid parameters using the Poseidon252 hash
+/// Hashes the internal Bid parameters using the Poseidon hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
 #[cfg(feature = "std")]

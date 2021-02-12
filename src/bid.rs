@@ -26,8 +26,8 @@ use dusk_jubjub::{
     JubJubAffine, JubJubScalar, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
 };
 use dusk_pki::{Ownable, StealthAddress};
-use poseidon252::cipher::PoseidonCipher;
-use poseidon252::sponge;
+use dusk_poseidon::cipher::PoseidonCipher;
+use dusk_poseidon::sponge;
 use rand_core::{CryptoRng, RngCore};
 pub use score::Score;
 
@@ -46,10 +46,10 @@ pub use score::Score;
 /// verification.
 ///
 /// The Bid is also designed to be stored within a
-/// [PoseidonTree](poseidon252::tree::PoseidonTree). Although it's not
+/// [PoseidonTree](dusk_poseidon::tree::PoseidonTree). Although it's not
 /// responsability of this crate to provide such implementation. To make that
 /// happen, make sure to implement
-/// [PoseidonLeaf](poseidon252::tree::PoseidonLeaf) trait for it or a wrapper
+/// [PoseidonLeaf](dusk_poseidon::tree::PoseidonLeaf) trait for it or a wrapper
 /// structure.
 /// # Example
 /// ```ignore
