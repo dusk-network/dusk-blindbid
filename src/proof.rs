@@ -70,11 +70,11 @@ use dusk_plonk::constraint_system::ecc::{
     scalar_mul::fixed_base::scalar_mul, Point,
 };
 use dusk_plonk::prelude::*;
-use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
-use poseidon252::{
+use dusk_poseidon::{
     sponge,
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
+use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
 #[cfg(test)]
 mod bid_tests;
 #[cfg(test)]

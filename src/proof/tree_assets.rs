@@ -11,7 +11,7 @@ use canonical::{Canon, Store};
 use canonical_derive::Canon;
 use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
-use poseidon252::tree::{
+use dusk_poseidon::tree::{
     PoseidonBranch, PoseidonLeaf, PoseidonMaxAnnotation, PoseidonTree,
 };
 

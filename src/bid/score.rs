@@ -21,7 +21,7 @@ cfg_if::cfg_if! {
         use dusk_plonk::prelude::*;
         use num_bigint::BigUint;
         use num_traits::{One, Zero};
-        use poseidon252::sponge;use plonk_gadgets::{
+        use dusk_poseidon::sponge;use plonk_gadgets::{
             AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
 };
     }
