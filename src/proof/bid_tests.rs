@@ -74,7 +74,7 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute_score(
+        let score = Score::compute(
             &bid,
             &secret,
             secret_k,
@@ -162,7 +162,7 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let mut score = Score::compute_score(
+        let mut score = Score::compute(
             &bid,
             &secret,
             secret_k,
@@ -245,7 +245,7 @@ mod protocol_tests {
             .expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute_score(
+        let score = Score::compute(
             &bid,
             &secret,
             secret_k,
@@ -345,7 +345,7 @@ mod protocol_tests {
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute_score(
+        let score = Score::compute(
             &bid,
             &secret,
             secret_k,
@@ -448,7 +448,7 @@ mod protocol_tests {
         let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
 
         // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute_score(
+        let score = Score::compute(
             &bid,
             &secret,
             secret_k,
