@@ -278,15 +278,20 @@ impl Bid {
         self.expiration
     }
 
+    /// Returns a mutable ref pointing to the `pos` field of the
+    /// Bid.
+    pub fn extend_expiration(&mut self, extension: u64) {
+        self.expiration += extension;
+    }
+
     /// Returns the `pos` field of the Bid.
     pub fn pos(&self) -> u64 {
         self.pos
     }
 
-    /// Returns a mutable ref pointing to the `pos` field of the
-    /// Bid.
-    pub fn set_pos(&mut self) -> &mut u64 {
-        &mut self.pos
+    /// Sets a new value for the position of the Bid.
+    pub fn set_pos(&mut self, new_pos: u64) {
+        self.pos = new_pos;
     }
 
     /// Performs the [sponge_hash](sponge::hash) techniqe using poseidon to

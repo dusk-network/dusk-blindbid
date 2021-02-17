@@ -1,6 +1,6 @@
 [package]
 name = "dusk-blindbid"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 license = "MPL-2.0"
@@ -18,7 +18,7 @@ exclude = [
 ]
 
 [dependencies]
-dusk-pki = {version = "0.6", tag = "v0.6.0", default-features = false}
+dusk-pki = {version = "0.6", default-features = false}
 dusk-poseidon = {version = "0.18", default-features = false }
 dusk-bls12_381 = {version = "0.6", default-features = false}
 dusk-jubjub = {version = "0.8", default-features = false}
