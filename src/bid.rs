@@ -280,8 +280,8 @@ impl Bid {
 
     /// Returns a mutable ref pointing to the `pos` field of the
     /// Bid.
-    pub fn expiration_mut(&mut self) -> &mut u64 {
-        &mut self.expiration
+    pub fn extend_expiration(&mut self, extension: u64) {
+        self.expiration += extension;
     }
 
     /// Returns the `pos` field of the Bid.
