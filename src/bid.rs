@@ -278,6 +278,12 @@ impl Bid {
         self.expiration
     }
 
+    /// Mutable representation of the expiration
+    #[cfg(feature = "internals")]
+    pub fn expiration_mut(&mut self) -> &mut u64 {
+        &mut self.expiration
+    }
+
     /// Returns a mutable ref pointing to the `pos` field of the
     /// Bid.
     pub fn extend_expiration(&mut self, extension: u64) {

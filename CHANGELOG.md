@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `extend_expiration()` for `Bid`. [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
+- Added feature `internals` for methods that have no intended use.
 
 ### Changed
 

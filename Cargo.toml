@@ -58,3 +58,4 @@ canon = [
     "dusk-poseidon/canon",
     "dusk-pki/canon",
 ]
+internals=[]
