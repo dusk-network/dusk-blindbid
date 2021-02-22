@@ -273,6 +273,11 @@ impl Bid {
         self.eligibility
     }
 
+    /// Sets a new value for the eligibility of the Bid.
+    pub fn set_eligibility(&mut self, new_eligibility: u64) {
+        self.eligibility = new_eligibility;
+    }
+
     /// Returns the `expiration` field of the Bid.
     pub fn expiration(&self) -> u64 {
         self.expiration
