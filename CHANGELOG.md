@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 22-02-21
+
+### Added
+
+- Added `set_eligibility` for `Bid`. [#121](https://github.com/dusk-network/dusk-blindbid/issues/125)
+
 ## [0.7.0] - 17-02-21
 
 ### Added
