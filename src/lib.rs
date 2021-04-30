@@ -4,9 +4,9 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! ![GitHub branch checks state](https://img.shields.io/github/checks-status/dusk-network/dusk-blindbid/master)
-//! ![GitHub](https://img.shields.io/github/license/dusk-network/dusk-blindbid)
-//! ![Crates.io](https://img.shields.io/crates/v/dusk-blindbid)
+//! ![Build Status](https://github.com/dusk-network/dusk--blindbid/workflows/Continuous%20integration/badge.svg)
+//! [![Repository](https://img.shields.io/badge/github-dusk--blindbid-blueviolet?logo=github)](https://github.com/dusk-network/dusk-blindbid)
+//! [![Documentation](https://img.shields.io/badge/docs-dusk--blindbid-blue?logo=rust)](https://docs.rs/dusk-blindbid/)
 //!
 //! # Rationale & Theory
 //!
@@ -54,6 +54,7 @@
 //!
 //! ### Blind Bid Circuit
 //! ![Fig1](https://user-images.githubusercontent.com/1636833/107039495-4391ae00-67be-11eb-8c76-9314c0f3b77c.png)
+//!
 //! Some noteworthy proofs are:
 //!
 //! Opening Proof: this is generated to check where the Bid has been stored on
@@ -83,6 +84,7 @@
 //!
 //! ### Score Generation Circuit
 //! ![Fig2](https://user-images.githubusercontent.com/1636833/107039501-455b7180-67be-11eb-8e69-f7a96cf98d52.png)
+//!
 //! Score generation needs to be understood as a continuation of the next
 //! circuit instead of a different entity.
 //!
