@@ -62,7 +62,6 @@
 
 use crate::bid::score::Score;
 use crate::bid::{encoding::preimage_gadget, Bid};
-use anyhow::Result;
 use dusk_bls12_381::BlsScalar;
 use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_pki::Ownable;
@@ -91,28 +90,19 @@ mod tree_assets;
 ///
 /// # Example
 /// ```ignore
-/// // Initialize your `PublicInput` Vector.
-/// let pi = vec![
-///     PublicInput::BlsScalar(*branch.root(), 0),
-///     PublicInput::BlsScalar(storage_bid, 0),
-///     PublicInput::AffinePoint(bid.commitment(), 0, 0),
-///     PublicInput::BlsScalar(bid.hashed_secret(), 0),
-///     PublicInput::BlsScalar(prover_id, 0),
-///     PublicInput::BlsScalar(score.value(), 0)];
+/// let (pk, vd) = BlindBidCircuit::default().compile();
+/// // Initialize your `PublicInputValue` Vector.
+/// let pi: Vec<PublicInputValue> = vec![
+///     (*branch.root()).into(),
+///     storage_bid.into(),
+///     bid.commitment().into(),
+///     bid.hashed_secret().into(),
+///     prover_id.into(),
+///     score.value().into(),
+/// ];
 ///
-/// // Create a mutable instance of the BlindBidCircuit and
-/// //
-/// let mut circuit = BlindBidCircuit {
-///     bid,
-///     score: Score::default(),
-///     secret_k: BlsScalar::one(),
-///     secret: JubJubAffine::default(),
-///     seed: BlsScalar::from(consensus_round_seed),
-///     latest_consensus_round: BlsScalar::from(latest_consensus_round),
-///     latest_consensus_step: BlsScalar::from(latest_consensus_step),
-///     branch: &branch,
-/// };
-/// circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
+/// // Assuming we got a proof from somewhere which we want to verify.
+/// circuit::verify_proof(&pub_params, &vd.key(), &proof, &pi, &vd.pi_pos(), b"CorrectnessBid")
 /// ```
 #[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "canon"))))]
 #[derive(Debug, Clone)]

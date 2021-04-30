@@ -17,9 +17,10 @@ cfg_if::cfg_if! {
         use dusk_plonk::prelude::*;
         use num_bigint::BigUint;
         use num_traits::{One, Zero};
-        use dusk_poseidon::sponge;use plonk_gadgets::{
+        use dusk_poseidon::sponge;
+        use plonk_gadgets::{
             AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
-};
+        };
     }
 }
 
@@ -370,7 +371,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
+    use crate::BlindBidError;
     use dusk_bytes::Serializable;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
@@ -446,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_score_gen_proof() -> Result<(), Error> {
+    fn correct_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -541,11 +542,13 @@ mod tests {
             alloc_latest_consensus_step,
         );
         verifier.preprocess(&ck)?;
-        verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])
+        verifier
+            .verify(&proof, &vk, &vec![BlsScalar::zero()])
+            .map_err(|e| e.into())
     }
 
     #[test]
-    fn incorrect_score_gen_proof() -> Result<()> {
+    fn incorrect_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;

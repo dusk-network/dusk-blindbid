@@ -8,7 +8,6 @@
 
 use super::tree_assets::BidTree;
 use crate::{Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN};
-use anyhow::Result;
 use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
@@ -126,7 +125,7 @@ mod protocol_tests {
     }
 
     #[test]
-    fn edited_score_blindbid_proof() -> Result<()> {
+    fn edited_score_blindbid_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -211,7 +210,7 @@ mod protocol_tests {
     }
 
     #[test]
-    fn edited_bid_value_blindbid_proof() -> Result<()> {
+    fn edited_bid_value_blindbid_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -296,7 +295,7 @@ mod protocol_tests {
     }
 
     #[test]
-    fn expired_bid_proof() -> Result<()> {
+    fn expired_bid_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -401,7 +400,7 @@ mod protocol_tests {
     }
 
     #[test]
-    fn non_elegible_bid() -> Result<()> {
+    fn non_elegible_bid() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;

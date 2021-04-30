@@ -31,7 +31,6 @@ lazy_static = "1.4"
 canonical = { version = "0.6", optional = true }
 canonical_derive = { version = "0.6", optional = true }
 rand = {version = "0.8"}
-anyhow = {version = "1", optional = true}
 dusk-bytes = "0.1"
 cfg-if = "1.0"
 
@@ -42,7 +41,6 @@ microkelvin = "0.7.1"
 [features]
 default = ["std", "canon"]
 std = [
-    "anyhow",
     "dusk-jubjub/std",
     "dusk-bls12_381/std",
     "dusk-plonk",
