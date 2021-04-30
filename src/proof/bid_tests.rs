@@ -65,7 +65,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into());
+        tree.push(bid.into()).unwrap();
 
         // Extract the branch
         let branch =
@@ -115,16 +115,6 @@ mod protocol_tests {
             score.value().into(),
         ];
 
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score: Score::default(),
-            secret_k: BlsScalar::one(),
-            secret: JubJubAffine::default(),
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
         circuit::verify_proof(
             &pub_params,
             &vd.key(),
@@ -155,7 +145,7 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into());
+        tree.push(bid.into()).unwrap();
 
         // Extract the branch
         let branch =
@@ -241,7 +231,7 @@ mod protocol_tests {
         let latest_consensus_step = 25519u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into());
+        tree.push(bid.into()).unwrap();
 
         // Extract the branch
         let branch =
@@ -338,7 +328,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid.into());
+        tree.push(bid.into()).unwrap();
 
         // Extract the branch
         let branch =
@@ -443,7 +433,7 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid.into());
+        tree.push(bid.into()).unwrap();
 
         // Extract the branch
         let branch =

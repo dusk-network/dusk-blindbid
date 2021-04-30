@@ -155,7 +155,6 @@ mod tests {
     use super::*;
     use anyhow::Result;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
-    use dusk_plonk::constraint_system::ecc::Point;
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use plonk_gadgets::AllocatedScalar;
     use rand::Rng;

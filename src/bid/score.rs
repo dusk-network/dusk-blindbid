@@ -6,12 +6,8 @@
 
 //! Score generation
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "canon")] {
-        use canonical::Canon;
-        use canonical_derive::Canon;
-    }
-}
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {

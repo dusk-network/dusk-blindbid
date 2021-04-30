@@ -15,8 +15,6 @@ pub(crate) mod score;
 use crate::errors::BlindBidError;
 
 #[cfg(feature = "canon")]
-use canonical::Canon;
-#[cfg(feature = "canon")]
 use canonical_derive::Canon;
 
 use core::borrow::Borrow;
