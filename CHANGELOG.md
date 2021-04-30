@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Refactor error module to include plonk & poseidon err variants. [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
+
+### Removed
+- Remove `anyhow` from the crate. [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
+
 ## [0.7.1] - 22-02-21
 
 ### Added
 
-- Added `set_eligibility` for `Bid`. [#121](https://github.com/dusk-network/dusk-blindbid/issues/125)
+- Added `set_eligibility` for `Bid`. [#125](https://github.com/dusk-network/dusk-blindbid/issues/125)
 
 ## [0.7.0] - 17-02-21
 

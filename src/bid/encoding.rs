@@ -153,7 +153,6 @@ pub(crate) fn preimage_gadget(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use plonk_gadgets::AllocatedScalar;
