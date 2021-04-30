@@ -290,8 +290,8 @@ impl Bid {
     }
 
     /// Returns the `pos` field of the Bid.
-    pub fn pos(&self) -> u64 {
-        self.pos
+    pub fn pos(&self) -> &u64 {
+        &self.pos
     }
 
     /// Sets a new value for the position of the Bid.
@@ -389,7 +389,7 @@ mod bid_serialization {
             let stealth_addr = pk_r.gen_stealth_address(&secret);
             let secret = GENERATOR_EXTENDED * secret;
             let value: u64 =
-                (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
+                (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
             let value = JubJubScalar::from(value);
             // Set the timestamps as the max values so the proofs do not fail
             // for them (never expired or non-elegible).
