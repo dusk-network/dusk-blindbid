@@ -4,9 +4,9 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! ![GitHub branch checks state](https://img.shields.io/github/checks-status/dusk-network/dusk-blindbid/master)
-//! ![GitHub](https://img.shields.io/github/license/dusk-network/dusk-blindbid)
-//! ![Crates.io](https://img.shields.io/crates/v/dusk-blindbid)
+//! ![Build Status](https://github.com/dusk-network/dusk--blindbid/workflows/Continuous%20integration/badge.svg)
+//! [![Repository](https://img.shields.io/badge/github-dusk--blindbid-blueviolet?logo=github)](https://github.com/dusk-network/dusk-blindbid)
+//! [![Documentation](https://img.shields.io/badge/docs-dusk--blindbid-blue?logo=rust)](https://docs.rs/dusk-blindbid/)
 //!
 //! # Rationale & Theory
 //!
@@ -19,7 +19,7 @@
 //! compete with the other Block Generators for a chance to become the winner of
 //! the consensus round.
 //!
-//! ![](https://public.bnbstatic.com/static/research/static/images/projects/dusk-network/image18.png)
+//! ![](https://user-images.githubusercontent.com/1636833/107039506-468c9e80-67be-11eb-9fb1-7ba999b3d6dc.png)
 //!
 //! Below we describe the three main processes that happen
 //! every consensus round. Please note that 1 and 2 are run as part of the same
@@ -53,7 +53,8 @@
 //! who together form the pillars of the Proof-of-Blind Bid procedure.
 //!
 //! ### Blind Bid Circuit
-//! ![Fig1](https://lh4.googleusercontent.com/oPR_7LLAAj6K8qjxiqMMavfucdslgv3DAGcElrn6hwDLMk0mYucfcwPyqLoT0HIyqvqmUDof4PhnXFV6-3tbImYtdG4WNHJcq72GaLsHHKE4EMiIv8pMJqLplGVlzuK6nIYsUp_r)
+//! ![Fig1](https://user-images.githubusercontent.com/1636833/107039495-4391ae00-67be-11eb-8c76-9314c0f3b77c.png)
+//!
 //! Some noteworthy proofs are:
 //!
 //! Opening Proof: this is generated to check where the Bid has been stored on
@@ -82,7 +83,8 @@
 //! Once the process above has been completed we move to Score Generation.
 //!
 //! ### Score Generation Circuit
-//! ![Fig2](https://lh5.googleusercontent.com/I6b88LUtOM5MIcbkJu3p0CZdoz34kBl7PXFovQbt4uiuAExOyW0yfLsI-1BbnzOh0u_kDv5LOB0ztuJgrh7h3y2Qh94qNN4FnP6P2Yi0cxHjJhWC3sSA49jEZtYLSutXIDkwC4Dz)
+//! ![Fig2](https://user-images.githubusercontent.com/1636833/107039501-455b7180-67be-11eb-8e69-f7a96cf98d52.png)
+//!
 //! Score generation needs to be understood as a continuation of the next
 //! circuit instead of a different entity.
 //!

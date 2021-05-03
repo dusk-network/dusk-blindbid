@@ -1,8 +1,8 @@
 # dusk-blindbid
 
-![GitHub branch checks state](https://img.shields.io/github/checks-status/dusk-network/dusk-blindbid/master)
-![GitHub](https://img.shields.io/github/license/dusk-network/dusk-blindbid)
-![Crates.io](https://img.shields.io/crates/v/dusk-blindbid)
+![Build Status](https://github.com/dusk-network/dusk--blindbid/workflows/Continuous%20integration/badge.svg)
+[![Repository](https://img.shields.io/badge/github-dusk--blindbid-blueviolet?logo=github)](https://github.com/dusk-network/dusk-blindbid)
+[![Documentation](https://img.shields.io/badge/docs-dusk--blindbid-blue?logo=rust)](https://docs.rs/dusk-blindbid/)
 
 ## Rationale & Theory
 
@@ -15,14 +15,13 @@ executes various steps in order to generate a valid candidate block, and
 compete with the other Block Generators for a chance to become the winner of
 the consensus round.
 
-![](https://public.bnbstatic.com/static/research/static/images/projects/dusk-network/image18.png)
+![](https://user-images.githubusercontent.com/1636833/107039506-468c9e80-67be-11eb-9fb1-7ba999b3d6dc.png)
 
 Below we describe the three main processes that happen
 every consensus round. Please note that 1 and 2 are run as part of the same
 algorithm.
 
 ### 1: Score generation.
-
 Block Generators obtain a score from a lottery by executing the Score
 Generation Function. The score is positively influenced by the amount of
 DUSK that the Block Generator bids. In other words, the higher the bid, the
@@ -50,8 +49,8 @@ Below we describe the Blind Bid circuit and the score generation circuit,
 who together form the pillars of the Proof-of-Blind Bid procedure.
 
 #### Blind Bid Circuit
+![Fig1](https://user-images.githubusercontent.com/1636833/107039495-4391ae00-67be-11eb-8c76-9314c0f3b77c.png)
 
-![Fig1](https://lh4.googleusercontent.com/oPR_7LLAAj6K8qjxiqMMavfucdslgv3DAGcElrn6hwDLMk0mYucfcwPyqLoT0HIyqvqmUDof4PhnXFV6-3tbImYtdG4WNHJcq72GaLsHHKE4EMiIv8pMJqLplGVlzuK6nIYsUp_r)
 Some noteworthy proofs are:
 
 Opening Proof: this is generated to check where the Bid has been stored on
@@ -80,8 +79,8 @@ assume has posted the bid -, indeed is the owner of the bid.
 Once the process above has been completed we move to Score Generation.
 
 #### Score Generation Circuit
+![Fig2](https://user-images.githubusercontent.com/1636833/107039501-455b7180-67be-11eb-8e69-f7a96cf98d52.png)
 
-![Fig2](https://lh5.googleusercontent.com/I6b88LUtOM5MIcbkJu3p0CZdoz34kBl7PXFovQbt4uiuAExOyW0yfLsI-1BbnzOh0u_kDv5LOB0ztuJgrh7h3y2Qh94qNN4FnP6P2Yi0cxHjJhWC3sSA49jEZtYLSutXIDkwC4Dz)
 Score generation needs to be understood as a continuation of the next
 circuit instead of a different entity.
 
@@ -94,7 +93,6 @@ automatically result in a different prover ID, and thus a failed constraint
 on line 1. of the Score Generation Circuit.
 
 ### 3. Propagation.
-
 During each consensus round, the Block Generator checks
 the score that he produced, and verifies whether it is greater than the
 _**minimum score threshold**_. If it is indeed greater, then the Block
@@ -105,25 +103,23 @@ The Block Generator that computed the highest score is considered to be the
 leader of the current iteration of the consensus.
 
 ## Documentation
-
 The best usage example of this library can actually be found in the Bid
 contract. This is the place where this lib provides all it's
 functionallities together with PoseidonTrees and Zero Knowledge Proofs.
-See: https://github.com/dusk-network/rusk/tree/master/contracts/bid for more info and detail.
+See: <https://github.com/dusk-network/rusk/tree/master/contracts/bid for more info and detail.>
 
 You can also check the documentation of this crate [here](https://docs.rs/dusk-blindbid/0.5.0/).
 
 ## Licensing
-
 This code is licensed under Mozilla Public License Version 2.0 (MPL-2.0).
 Please see [LICENSE](https://github.com/dusk-network/dusk-blindbid/blob/master/LICENSE) for further info.
 
 ## About
-
 Protocol & Implementation designed by the [dusk](https://dusk.network) team.
 
 ## Contributing
-
 - If you want to contribute to this repository/project please, check [CONTRIBUTING.md](https://github.com/dusk-network/dusk-blindbid/blob/master/CONTRIBUTING.md)
 - If you want to report a bug or request a new feature addition, please open
   an issue on this repository.
+
+License: MPL-2.0
