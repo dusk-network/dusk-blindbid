@@ -7,13 +7,11 @@
 #![allow(non_snake_case)]
 
 use crate::Bid;
-use canonical::{Canon, Store};
 use canonical_derive::Canon;
 use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
-use dusk_poseidon::tree::{
-    PoseidonBranch, PoseidonLeaf, PoseidonMaxAnnotation, PoseidonTree,
-};
+use dusk_poseidon::tree::{PoseidonLeaf, PoseidonMaxAnnotation, PoseidonTree};
+use microkelvin::Keyed;
 
 #[derive(Debug, Clone, Copy, Canon)]
 pub struct BidLeaf(pub(crate) Bid);
@@ -55,15 +53,12 @@ impl From<BidLeaf> for Bid {
     }
 }
 
-impl<S> PoseidonLeaf<S> for BidLeaf
-where
-    S: Store,
-{
+impl PoseidonLeaf for BidLeaf {
     fn poseidon_hash(&self) -> BlsScalar {
         self.0.hash()
     }
 
-    fn pos(&self) -> u64 {
+    fn pos(&self) -> &u64 {
         self.0.pos()
     }
 
@@ -72,37 +67,10 @@ where
     }
 }
 
-pub struct BidTree<S: Store>(
-    PoseidonTree<BidLeaf, PoseidonMaxAnnotation, S, 17usize>,
-);
-
-impl<S> BidTree<S>
-where
-    S: Store,
-{
-    /// Constructor
-    pub fn new() -> Self {
-        Self(PoseidonTree::new())
-    }
-
-    /// Get a bid from a provided index
-    #[allow(dead_code)]
-    pub fn get(&self, idx: u64) -> Option<BidLeaf> {
-        self.0.get(idx as usize).unwrap()
-    }
-
-    /// Append a bid to the tree and return its index
-    ///
-    /// The index will be the last available position
-    pub fn push(&mut self, bid: BidLeaf) -> usize {
-        self.0.push(bid).unwrap()
-    }
-
-    /// Returns a poseidon branch pointing at the specific index
-    pub fn poseidon_branch(
-        &self,
-        idx: usize,
-    ) -> Option<PoseidonBranch<17usize>> {
-        self.0.branch(idx).unwrap()
+impl Keyed<u64> for BidLeaf {
+    fn key(&self) -> &u64 {
+        &self.0.pos()
     }
 }
+
+pub type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;

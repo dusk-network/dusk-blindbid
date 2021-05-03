@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Change Bid API getters returning by ref and not value [#124](https://github.com/dusk-network/dusk-blindbid/issues/124)
+
 ## [0.7.1] - 22-02-21
 
 ### Added

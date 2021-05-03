@@ -66,9 +66,6 @@ use anyhow::Result;
 use dusk_bls12_381::BlsScalar;
 use dusk_jubjub::{JubJubAffine, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED};
 use dusk_pki::Ownable;
-use dusk_plonk::constraint_system::ecc::{
-    scalar_mul::fixed_base::scalar_mul, Point,
-};
 use dusk_plonk::prelude::*;
 use dusk_poseidon::{
     sponge,
@@ -114,8 +111,6 @@ mod tree_assets;
 ///     latest_consensus_round: BlsScalar::from(latest_consensus_round),
 ///     latest_consensus_step: BlsScalar::from(latest_consensus_step),
 ///     branch: &branch,
-///     trim_size: 1 << 15,
-///     pi_positions: vec![],
 /// };
 /// circuit.verify_proof(&pub_params, &vk, b"CorrectBid", &proof, &pi)
 /// ```
@@ -138,14 +133,11 @@ pub struct BlindBidCircuit<'a> {
     pub branch: &'a PoseidonBranch<17>,
     /// Secret that derypts the Cipher.
     pub secret: JubJubAffine,
-    /// Trim size of the Public Parameters used by the PLONK mechanism.
-    pub trim_size: usize,
-    /// Positions of the Public Inputs used with the proof.
-    pub pi_positions: Vec<PublicInput>,
 }
 
-impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
-    fn gadget(&mut self, composer: &mut StandardComposer) -> Result<()> {
+impl<'a> Circuit for BlindBidCircuit<'a> {
+    const CIRCUIT_ID: [u8; 32] = [0xff; 32];
+    fn gadget(&mut self, composer: &mut StandardComposer) -> Result<(), Error> {
         // Check if the inputs were indeed pre-loaded inside of the circuit
         // structure.
         let bid = self.bid;
@@ -156,8 +148,6 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let latest_consensus_step = self.latest_consensus_step;
         let score = self.score;
         let secret = self.secret;
-        // Instantiate PI vector.
-        let pi = self.get_mut_pi_positions();
         // Get the corresponding `StorageBid` value that for the `Bid`
         // which is effectively the value of the proven leaf (hash of the Bid)
         // and allocate it.
@@ -165,33 +155,26 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         let bid_hash = AllocatedScalar::allocate(composer, storage_bid);
         // Allocate Bid-internal fields
         let bid_hashed_secret =
-            AllocatedScalar::allocate(composer, bid.hashed_secret());
+            AllocatedScalar::allocate(composer, *bid.hashed_secret());
         let bid_cipher = (
             composer.add_input(bid.encrypted_data().cipher()[0]),
             composer.add_input(bid.encrypted_data().cipher()[1]),
         );
-        let bid_commitment =
-            Point::from_private_affine(composer, bid.commitment());
+        let bid_commitment = composer.add_affine(*bid.commitment());
         let bid_stealth_addr = (
-            Point::from_private_affine(
-                composer,
-                bid.stealth_address().pk_r().as_ref().into(),
-            ),
-            Point::from_private_affine(
-                composer,
-                bid.stealth_address().R().into(),
-            ),
+            composer.add_affine(bid.stealth_address().pk_r().as_ref().into()),
+            composer.add_affine(bid.stealth_address().R().into()),
         );
         let bid_eligibility_ts = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.eligibility()),
+            BlsScalar::from(*bid.eligibility()),
         );
         let bid_expiration = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.expiration()),
+            BlsScalar::from(*bid.expiration()),
         );
         let pos =
-            AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos()));
+            AllocatedScalar::allocate(composer, BlsScalar::from(*bid.pos()));
         // Allocate bid-needed inputs
         let secret_k = AllocatedScalar::allocate(composer, secret_k);
         let seed = AllocatedScalar::allocate(composer, seed);
@@ -223,16 +206,15 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         // ------------------------------------------------------- //
 
         // 1. Merkle Opening
-        let root = merkle_opening_gadget(composer, branch, bid_hash.var);
-        // Add PI constraint for the root to the PI constructor
-        pi.push(PublicInput::BlsScalar(
-            -branch.root(),
-            composer.circuit_size(),
-        ));
+        let root = merkle_opening_gadget(composer, branch);
 
         // Constraint the bid_tree_root against a PI that represents
         // the root of the Bid tree that lives inside of the `Bid` contract.
-        composer.constrain_to_constant(root, BlsScalar::zero(), -branch.root());
+        composer.constrain_to_constant(
+            root,
+            BlsScalar::zero(),
+            Some(-branch.root()),
+        );
 
         // 2. Bid pre_image check
         let computed_bid_hash = preimage_gadget(
@@ -246,16 +228,11 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             pos.var,
         );
 
-        // Add PI constraint for bid preimage check.
-        pi.push(PublicInput::BlsScalar(
-            -bid_hash.scalar,
-            composer.circuit_size(),
-        ));
         // Constraint the hash to be equal to the real one
         composer.constrain_to_constant(
             computed_bid_hash,
             BlsScalar::zero(),
-            -bid_hash.scalar,
+            Some(-bid_hash.scalar),
         );
 
         // 3. t_a >= k_t
@@ -264,7 +241,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             (BlsScalar::one(), latest_consensus_round.var),
             (-BlsScalar::one(), bid_eligibility_ts.var),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         let kt_min_ta_scalar =
             latest_consensus_round.scalar - bid_eligibility_ts.scalar;
@@ -282,11 +259,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         .0;
         // Constraint third condition to be one.
         // So basically, that the rangeproof does not hold.
-        composer.constrain_to_constant(
-            third_cond,
-            BlsScalar::one(),
-            BlsScalar::zero(),
-        );
+        composer.constrain_to_constant(third_cond, BlsScalar::one(), None);
 
         // 4. t_e >= k_t
         // k_t - t_e should be > 2^64 which is the max size of the round.
@@ -294,7 +267,7 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             (BlsScalar::one(), latest_consensus_round.var),
             (-BlsScalar::one(), bid_expiration.var),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         let kt_min_te_scalar =
             latest_consensus_round.scalar - bid_expiration.scalar;
@@ -312,25 +285,17 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
         .0;
         // Constraint third condition to be one.
         // So basically, that the rangeproof does not hold.
-        composer.constrain_to_constant(
-            fourth_cond,
-            BlsScalar::one(),
-            BlsScalar::zero(),
-        );
+        composer.constrain_to_constant(fourth_cond, BlsScalar::one(), None);
 
         // 5. c = C(v, b) Pedersen Commitment check
-        let p1 = scalar_mul(composer, bid_value.var, GENERATOR_EXTENDED);
-        let p2 = scalar_mul(composer, bid_blinder.var, GENERATOR_NUMS_EXTENDED);
-        let computed_c = p1.point().fast_add(composer, *p2.point());
-        // Add PI constraint for the commitment computation check.
-        pi.push(PublicInput::AffinePoint(
-            bid.commitment(),
-            composer.circuit_size(),
-            composer.circuit_size() + 1,
-        ));
+        let p1 =
+            composer.fixed_base_scalar_mul(bid_value.var, GENERATOR_EXTENDED);
+        let p2 = composer
+            .fixed_base_scalar_mul(bid_blinder.var, GENERATOR_NUMS_EXTENDED);
+        let computed_c = composer.point_addition_gate(p1, p2);
 
         // Assert computed_commitment == announced commitment.
-        composer.assert_equal_public_point(computed_c, bid.commitment());
+        composer.assert_equal_public_point(computed_c, *bid.commitment());
 
         // 6. 0 < value <= 2^64 range check
         // v < 2^64
@@ -338,18 +303,13 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
 
         // 7. `m = H(k)` Secret key pre-image check.
         let secret_k_hash = sponge::gadget(composer, &[secret_k.var]);
-        // Add PI constraint for the secret_k_hash.
-        pi.push(PublicInput::BlsScalar(
-            -bid.hashed_secret(),
-            composer.circuit_size(),
-        ));
 
         // Constraint the secret_k_hash to be equal to the publicly avaliable
         // one.
         composer.constrain_to_constant(
             secret_k_hash,
             BlsScalar::zero(),
-            -bid.hashed_secret(),
+            Some(-bid.hashed_secret()),
         );
 
         // We generate the prover_id and constrain it to a public input
@@ -365,26 +325,15 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             ],
         );
 
-        // Constraint the prover_id to be the public one and set it in the PI
-        // constructor.
-        pi.push(PublicInput::BlsScalar(
-            -bid.generate_prover_id(
-                secret_k.scalar,
-                seed.scalar,
-                latest_consensus_round.scalar,
-                latest_consensus_step.scalar,
-            ),
-            composer.circuit_size(),
-        ));
         composer.constrain_to_constant(
             prover_id,
             BlsScalar::zero(),
-            -bid.generate_prover_id(
+            Some(-bid.generate_prover_id(
                 secret_k.scalar,
                 seed.scalar,
                 latest_consensus_round.scalar,
                 latest_consensus_step.scalar,
-            ),
+            )),
         );
 
         // 9. Score generation circuit check with the corresponding gadget.
@@ -398,33 +347,15 @@ impl<'a> Circuit<'a> for BlindBidCircuit<'a> {
             latest_consensus_step,
         );
 
-        // Constraint the score to be the public one and set it in the PI
-        // constructor.
-        pi.push(PublicInput::BlsScalar(
-            -score.value(),
-            composer.circuit_size(),
-        ));
         composer.constrain_to_constant(
             computed_score,
             BlsScalar::zero(),
-            -score.value(),
+            Some(-score.value()),
         );
         Ok(())
     }
 
-    fn get_pi_positions(&self) -> &Vec<PublicInput> {
-        &self.pi_positions
-    }
-
-    fn get_mut_pi_positions(&mut self) -> &mut Vec<PublicInput> {
-        &mut self.pi_positions
-    }
-
-    fn get_trim_size(&self) -> usize {
-        self.trim_size
-    }
-
-    fn set_trim_size(&mut self, size: usize) {
-        self.trim_size = size;
+    fn padded_circuit_size(&self) -> usize {
+        1 << 15
     }
 }
