@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release
+          args: --release --features std
 
   test_nightly_nostd:
     name: Nightly tests no_std
@@ -53,7 +53,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release --no-default-features
+          args: --release --no-default-features 
 
   test_nightly_canon_nostd:
     name: Nightly tests no_std + canon
