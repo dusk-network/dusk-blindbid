@@ -25,7 +25,7 @@ dusk-jubjub = {version = "0.10.0-rc.0", default-features = false}
 dusk-plonk = {version = "0.8.0-rc.1", default-features = false, features = ["alloc"]}
 num-bigint = {version = "0.3", optional = true } 
 num-traits = {version = "0.2", optional = true } 
-plonk_gadgets = {version = "0.6.0-rc.0", optional = true}
+plonk_gadgets = {version = "0.6.0-rc", optional = true}
 rand_core = {version = "0.6", default-features = false}  
 lazy_static = "1.4"
 canonical = { version = "0.6", optional = true }
@@ -35,7 +35,7 @@ dusk-bytes = "0.1"
 cfg-if = "1.0"
 
 [dev-dependencies]
-microkelvin = "0.7.1"
+microkelvin = "0.7"
 
 
 [features]
