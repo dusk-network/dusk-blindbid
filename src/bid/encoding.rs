@@ -159,6 +159,7 @@ mod tests {
     use super::*;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
+    use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
     fn random_bid(secret: &JubJubScalar) -> Bid {

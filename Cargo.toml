@@ -39,7 +39,7 @@ microkelvin = "0.7.1"
 
 
 [features]
-default = []
+default = ["canon"]
 std = [
     "dusk-jubjub/std",
     "dusk-bls12_381/std",
