@@ -7,7 +7,7 @@
 #![allow(non_snake_case)]
 
 use super::tree_assets::BidTree;
-use crate::{Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN};
+use crate::{Bid, BlindBidCircuit, Score, V_RAW_MAX, V_RAW_MIN};
 use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
@@ -44,8 +44,10 @@ fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
+    use crate::BlindBidError;
+
     #[test]
-    fn correct_blindbid_proof() -> Result<(), Error> {
+    fn correct_blindbid_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
@@ -64,11 +66,10 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into()).unwrap();
+        tree.push(bid.into())?;
 
         // Extract the branch
-        let branch =
-            tree.branch(0).expect("Poseidon Branch Extraction").unwrap();
+        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = Score::compute(
@@ -80,7 +81,7 @@ mod protocol_tests {
             latest_consensus_round,
             latest_consensus_step,
         )
-        .expect("Score computation error");
+        .expect("Score computation Blinnd");
 
         let prover_id = bid.generate_prover_id(
             secret_k,
@@ -114,14 +115,14 @@ mod protocol_tests {
             score.value().into(),
         ];
 
-        circuit::verify_proof(
+        Ok(circuit::verify_proof(
             &pub_params,
             &vd.key(),
             &proof,
             &pi,
             &vd.pi_pos(),
             b"CorrectBid",
-        )
+        )?)
     }
 
     #[test]
@@ -144,11 +145,10 @@ mod protocol_tests {
         let latest_consensus_step = 50u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into()).unwrap();
+        tree.push(bid.into())?;
 
         // Extract the branch
-        let branch =
-            tree.branch(0).expect("Poseidon Branch Extraction").unwrap();
+        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
         let mut score = Score::compute(
@@ -230,11 +230,10 @@ mod protocol_tests {
         let latest_consensus_step = 25519u64;
 
         // Append the Bid to the tree.
-        tree.push(bid.into()).unwrap();
+        tree.push(bid.into())?;
 
         // Extract the branch
-        let branch =
-            tree.branch(0).expect("Poseidon Branch Extraction").unwrap();
+        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
         // Generate a `Score` for our Bid with the consensus parameters
         let score = Score::compute(
@@ -327,11 +326,10 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid.into()).unwrap();
+        tree.push(bid.into())?;
 
         // Extract the branch
-        let branch =
-            tree.branch(0).expect("Poseidon Branch Extraction").unwrap();
+        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
         // We first generate the score as if the bid wasn't expired. Otherways
         // the score generation would fail since the Bid would be expired.
@@ -432,11 +430,10 @@ mod protocol_tests {
         .expect("Bid creation error");
 
         // Append the Bid to the tree.
-        tree.push(bid.into()).unwrap();
+        tree.push(bid.into())?;
 
         // Extract the branch
-        let branch =
-            tree.branch(0).expect("Poseidon Branch Extraction").unwrap();
+        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
         // We first generate the score as if the bid was still eligible.
         // Otherways the score generation would fail since the Bid
@@ -509,7 +506,9 @@ mod protocol_tests {
 #[cfg(test)]
 mod serialization_tests {
     use super::*;
+    use crate::BlindBidError;
     use core::result::Result;
+
     #[test]
     fn from_to_bytes_impl_works() -> Result<(), BlindBidError> {
         let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());

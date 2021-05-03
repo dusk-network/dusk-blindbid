@@ -407,7 +407,10 @@ mod tests {
         let rand_scalar = BlsScalar::random(&mut rand::thread_rng());
         let big_uint = BigUint::from_bytes_le(&rand_scalar.to_bytes());
 
-        assert_eq!(biguint_to_scalar(big_uint).unwrap(), rand_scalar)
+        assert_eq!(
+            biguint_to_scalar(big_uint).expect("BigUint conversion failed"),
+            rand_scalar
+        )
     }
 
     fn allocate_fields(
@@ -542,9 +545,7 @@ mod tests {
             alloc_latest_consensus_step,
         );
         verifier.preprocess(&ck)?;
-        verifier
-            .verify(&proof, &vk, &vec![BlsScalar::zero()])
-            .map_err(|e| e.into())
+        Ok(verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])?)
     }
 
     #[test]
