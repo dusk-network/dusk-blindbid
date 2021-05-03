@@ -9,7 +9,6 @@
 
 use super::tree_assets::BidTree;
 use crate::{Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN};
-use dusk_bytes::Serializable;
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;

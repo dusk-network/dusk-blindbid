@@ -14,25 +14,25 @@ if #[cfg(feature = "std")] {
         use num_bigint::BigUint;
         use num_traits::{One, Zero};
         use dusk_jubjub::JubJubAffine;
-        use crate::bid::Bid;
+        use crate::bid::{Bid, BlindBidError};
     }
 }
 
 use core::ops::Deref;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
-use dusk_plonk::prelude::*;
+use dusk_plonk::constraint_system::{StandardComposer, Variable};
 use dusk_poseidon::sponge;
 use plonk_gadgets::AllocatedScalar;
 use plonk_gadgets::{RangeGadgets::max_bound, ScalarGadgets::maybe_equal};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
-#[cfg_attr(feature = "canon", derive(Canon))]
 /// The `Score` represents a "random" value obtained from the computations
-/// based on blockchain data as well as [Bid](self::Bid) data.
+/// based on blockchain data as well as [Bid](crate::Bid) data.
 /// It derefs to it's value although the structure contains more fields which
 /// are side-results of this computation needed to proof the correctness of the
 /// Score generation process later on.
+#[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Score {
     pub(crate) value: BlsScalar,
     y: BlsScalar,

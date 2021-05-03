@@ -75,4 +75,4 @@ impl Keyed<u64> for BidLeaf {
 }
 
 #[allow(dead_code)]
-type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;
+pub type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;
