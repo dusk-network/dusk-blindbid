@@ -36,7 +36,7 @@ dusk-bytes = "0.1"
 cfg-if = "1.0"
 
 [dev-dependencies]
-microkelvin = "0.7.1"
+microkelvin = "0.7"
 
 
 [features]
