@@ -249,28 +249,28 @@ impl Bid {
     }
 
     /// Returns the `encrypted_data` field of the Bid.
-    pub fn encrypted_data(&self) -> PoseidonCipher {
-        self.encrypted_data
+    pub fn encrypted_data(&self) -> &PoseidonCipher {
+        &self.encrypted_data
     }
 
     /// Returns the `nonce` field of the Bid.
-    pub fn nonce(&self) -> BlsScalar {
-        self.nonce
+    pub fn nonce(&self) -> &BlsScalar {
+        &self.nonce
     }
 
     /// Returns the `hashed_secret` field of the Bid.
-    pub fn hashed_secret(&self) -> BlsScalar {
-        self.hashed_secret
+    pub fn hashed_secret(&self) -> &BlsScalar {
+        &self.hashed_secret
     }
 
     /// Returns the `commitment` field of the Bid.
-    pub fn commitment(&self) -> JubJubAffine {
-        self.c
+    pub fn commitment(&self) -> &JubJubAffine {
+        &self.c
     }
 
     /// Returns the `eligibility` field of the Bid.
-    pub fn eligibility(&self) -> u64 {
-        self.eligibility
+    pub fn eligibility(&self) -> &u64 {
+        &self.eligibility
     }
 
     /// Sets a new value for the eligibility of the Bid.
@@ -279,8 +279,8 @@ impl Bid {
     }
 
     /// Returns the `expiration` field of the Bid.
-    pub fn expiration(&self) -> u64 {
-        self.expiration
+    pub fn expiration(&self) -> &u64 {
+        &self.expiration
     }
 
     /// Returns a mutable ref pointing to the `pos` field of the
@@ -290,8 +290,8 @@ impl Bid {
     }
 
     /// Returns the `pos` field of the Bid.
-    pub fn pos(&self) -> u64 {
-        self.pos
+    pub fn pos(&self) -> &u64 {
+        &self.pos
     }
 
     /// Sets a new value for the position of the Bid.

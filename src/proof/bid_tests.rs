@@ -113,8 +113,8 @@ mod protocol_tests {
         let pi = vec![
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
-            PublicInput::AffinePoint(bid.commitment(), 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret(), 0),
+            PublicInput::AffinePoint(*bid.commitment(), 0, 0),
+            PublicInput::BlsScalar(*bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
             PublicInput::BlsScalar(score.value(), 0),
         ];
@@ -206,7 +206,7 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret(), 0),
+            PublicInput::BlsScalar(*bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
             PublicInput::BlsScalar(score.value(), 0),
         ];
@@ -288,7 +288,7 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret(), 0),
+            PublicInput::BlsScalar(*bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
             PublicInput::BlsScalar(score.value(), 0),
         ];
@@ -390,7 +390,7 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret(), 0),
+            PublicInput::BlsScalar(*bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
             PublicInput::BlsScalar(score.value(), 0),
         ];
@@ -493,7 +493,7 @@ mod protocol_tests {
             PublicInput::BlsScalar(*branch.root(), 0),
             PublicInput::BlsScalar(storage_bid, 0),
             PublicInput::AffinePoint(bid.c, 0, 0),
-            PublicInput::BlsScalar(bid.hashed_secret(), 0),
+            PublicInput::BlsScalar(*bid.hashed_secret(), 0),
             PublicInput::BlsScalar(prover_id, 0),
             PublicInput::BlsScalar(score.value(), 0),
         ];

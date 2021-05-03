@@ -64,7 +64,7 @@ where
     }
 
     fn pos(&self) -> u64 {
-        self.0.pos()
+        *self.0.pos()
     }
 
     fn set_pos(&mut self, pos: u64) {
