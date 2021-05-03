@@ -155,7 +155,6 @@ mod tests {
     use super::*;
     use anyhow::Result;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
-    use dusk_plonk::constraint_system::ecc::Point;
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
     use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
@@ -168,7 +167,7 @@ mod tests {
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+            .gen_range(crate::V_RAW_MIN..crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
 
         let eligibility = u64::MAX;
@@ -194,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn bid_preimage_gadget() -> Result<()> {
+    fn bid_preimage_gadget() -> Result<(), Error> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 14, &mut rand::thread_rng())?;
@@ -212,16 +211,10 @@ mod tests {
                 composer.add_input(bid.encrypted_data.cipher()[0]),
                 composer.add_input(bid.encrypted_data.cipher()[1]),
             );
-            let bid_commitment = Point::from_private_affine(composer, bid.c);
+            let bid_commitment = composer.add_affine(bid.c);
             let bid_stealth_addr = (
-                Point::from_private_affine(
-                    composer,
-                    bid.stealth_address.pk_r().as_ref().into(),
-                ),
-                Point::from_private_affine(
-                    composer,
-                    bid.stealth_address.R().into(),
-                ),
+                composer.add_affine(bid.stealth_address.pk_r().as_ref().into()),
+                composer.add_affine(bid.stealth_address.R().into()),
             );
             let eligibility = AllocatedScalar::allocate(
                 composer,
@@ -249,7 +242,7 @@ mod tests {
             composer.constrain_to_constant(
                 bid_hash,
                 BlsScalar::zero(),
-                -storage_bid,
+                Some(-storage_bid),
             );
         };
         // Proving
@@ -262,7 +255,7 @@ mod tests {
         let mut verifier = Verifier::new(b"testing");
         circuit(verifier.mut_cs(), &bid);
         verifier.preprocess(&ck)?;
-        let pi = verifier.mut_cs().public_inputs.clone();
+        let pi = verifier.mut_cs().construct_dense_pi_vec();
         verifier.verify(&proof, &vk, &pi)
     }
 }

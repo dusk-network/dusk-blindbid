@@ -6,12 +6,8 @@
 
 //! Score generation
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "canon")] {
-        use canonical::Canon;
-        use canonical_derive::Canon;
-    }
-}
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
@@ -228,7 +224,7 @@ impl Score {
             two_pow_128,
             -BlsScalar::one(),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         // 3.(r1 < |Fr|/2^128 AND Y' < 2^128) OR (r1 = |Fr|/2^128 AND Y' < |Fr|
         // mod 2^128).
@@ -269,7 +265,7 @@ impl Score {
             first_cond,
             second_cond,
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         // (r1 = |Fr|/2^128 AND Y' < |Fr| mod 2^128)
         let right_assign = composer.mul(
@@ -277,7 +273,7 @@ impl Score {
             third_cond,
             fourth_cond,
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         // left_assign XOR right_assign = 1
         // This is possible since condition 1. and 3. are mutually exclusive.
@@ -295,7 +291,7 @@ impl Score {
             BlsScalar::one(),
             BlsScalar::zero(),
             -BlsScalar::one(),
-            BlsScalar::zero(),
+            None,
         );
 
         // 4. r2 < Y'
@@ -303,7 +299,7 @@ impl Score {
             (BlsScalar::one(), r2.var),
             (-BlsScalar::one(), y_prime.var),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         let r2_min_y_prime_scalar = r2.scalar - y_prime.scalar;
         let r2_min_y_prime = AllocatedScalar {
@@ -320,11 +316,7 @@ impl Score {
 
         // Check that the result of the range_proof is indeed 0 to assert it
         // passed.
-        composer.constrain_to_constant(
-            should_be_one.0,
-            BlsScalar::one(),
-            BlsScalar::zero(),
-        );
+        composer.constrain_to_constant(should_be_one.0, BlsScalar::one(), None);
 
         // 5. q < 2^120
         composer.range_gate(score_alloc_scalar.var, 120usize);
@@ -336,14 +328,14 @@ impl Score {
             score_alloc_scalar.var,
             y_prime.var,
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         // q*Y' + r2
         let left = composer.add(
             (BlsScalar::one(), f_y_prime_prod),
             (BlsScalar::one(), r2.var),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
         // (q*Y' + r2) - v*2^128 = 0
         composer.add_gate(
@@ -354,7 +346,7 @@ impl Score {
             -two_pow_128,
             BlsScalar::zero(),
             BlsScalar::zero(),
-            BlsScalar::zero(),
+            None,
         );
 
         score_alloc_scalar.var
@@ -392,7 +384,7 @@ mod tests {
         let stealth_addr = pk_r.gen_stealth_address(&secret);
         let secret = GENERATOR_EXTENDED * secret;
         let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
+            .gen_range(crate::V_RAW_MIN..crate::V_RAW_MAX);
         let value = JubJubScalar::from(value);
         let eligibility = u64::MAX;
         let expiration = u64::MAX;
@@ -454,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_score_gen_proof() -> Result<()> {
+    fn correct_score_gen_proof() -> Result<(), Error> {
         // Generate Composer & Public Parameters
         let pub_params =
             PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
