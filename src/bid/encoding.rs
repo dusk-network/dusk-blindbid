@@ -8,11 +8,10 @@
 //! See: <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>
 
 use super::Bid;
+use alloc::vec::Vec;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::Serializable;
-#[cfg(feature = "std")]
 use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
-#[cfg(feature = "std")]
 use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
@@ -100,8 +99,6 @@ impl Into<BlsScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.
@@ -123,7 +120,7 @@ pub(crate) fn preimage_gadget(
     let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
 
     // Add to the composer the values required for the preimage.
-    let mut messages: Vec<Variable> = vec![];
+    let mut messages: Vec<Variable> = Vec::new();
     messages.push(composer.add_input(type_fields));
     // Push cipher as scalars.
     messages.push(encrypted_data.0);
@@ -149,7 +146,6 @@ pub(crate) fn preimage_gadget(
     sponge::gadget(composer, &messages)
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +187,7 @@ mod tests {
         // the research side.
     }
 
+    #[cfg(feature = "canon")]
     #[test]
     fn bid_preimage_gadget() -> Result<(), Error> {
         // Generate Composer & Public Parameters

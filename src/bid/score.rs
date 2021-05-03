@@ -4,23 +4,25 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Score generation
-
-#[cfg(feature = "canon")]
-use canonical_derive::Canon;
+//! Score generation module
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+if #[cfg(feature = "canon")] {
+        use canonical_derive::Canon;
+        use dusk_poseidon::sponge;
         use crate::errors::BlindBidError;
-        use crate::bid::Bid;
-        use dusk_jubjub::JubJubAffine;
+        use plonk_gadgets::{RangeGadgets::max_bound, ScalarGadgets::maybe_equal};
+        use plonk_gadgets::AllocatedScalar;
         use dusk_plonk::prelude::*;
+    }
+}
+
+cfg_if::cfg_if! {
+if #[cfg(feature = "std")] {
         use num_bigint::BigUint;
         use num_traits::{One, Zero};
-        use dusk_poseidon::sponge;
-        use plonk_gadgets::{
-            AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
-        };
+        use dusk_jubjub::JubJubAffine;
+        use crate::bid::Bid;
     }
 }
 
@@ -95,27 +97,24 @@ impl Score {
     }
 }
 
-#[cfg(feature = "std")]
-pub(self) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
-    BlsScalar::from_raw([
-        0x3339d80809a1d805,
-        0x73eda753299d7d48,
-        0x0000000000000000,
-        0x0000000000000000,
-    ]);
+const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar = BlsScalar::from_raw([
+    0x3339d80809a1d805,
+    0x73eda753299d7d48,
+    0x0000000000000000,
+    0x0000000000000000,
+]);
 
-#[cfg(feature = "std")]
-pub(self) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
+const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
     0xffffffff00000000,
     0x53bda402fffe5bfe,
     0x0000000000000000,
     0x0000000000000000,
 ]);
 
-#[cfg(feature = "std")]
 impl Score {
+    #[cfg(all(feature = "std", feature = "canon"))]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "canon"))))]
     /// Given a `Bid`, compute it's Score and return it.
-    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
     pub fn compute(
         bid: &Bid,
         secret: &JubJubAffine,
@@ -179,6 +178,7 @@ impl Score {
     /// Proves that a `Score` is correctly generated.
     /// Prints the proving statements in the passed Constraint System.
     #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
+    #[cfg(feature = "canon")]
     pub fn prove_correct_score_gadget(
         &self,
         composer: &mut StandardComposer,
@@ -367,14 +367,14 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     Ok(BlsScalar::from_bytes(&bytes).unwrap())
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BlindBidError;
-    use dusk_bytes::Serializable;
+    use crate::Bid;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
+    use dusk_plonk::prelude::*;
+    use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
     fn random_bid(secret: &JubJubScalar) -> Bid {
@@ -402,6 +402,7 @@ mod tests {
         .expect("Bid creation error")
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn biguint_scalar_conversion() {
         let rand_scalar = BlsScalar::random(&mut rand::thread_rng());
@@ -449,6 +450,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn correct_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
@@ -548,6 +550,7 @@ mod tests {
         Ok(verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])?)
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn incorrect_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters

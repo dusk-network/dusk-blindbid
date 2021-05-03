@@ -6,12 +6,11 @@
 
 //! Errors related to the BlindBid module
 
+use core::fmt;
 use dusk_bytes::Error as DuskBytesError;
 use dusk_jubjub::JubJubScalar;
 use dusk_plonk::error::Error as PlonkError;
 use dusk_poseidon::Error as PoseidonError;
-#[cfg(feature = "std")]
-use std::fmt;
 
 #[derive(Debug)]
 /// Compilation of the erros that blindbid procedures might end up producing.
@@ -50,7 +49,6 @@ pub enum BlindBidError {
     PoseidonError(PoseidonError),
 }
 
-#[cfg(feature = "std")]
 impl fmt::Display for BlindBidError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Bid Generation Error: {:?}", &self)
