@@ -6,16 +6,8 @@
 
 //! Score generation module
 
-cfg_if::cfg_if! {
-if #[cfg(feature = "canon")] {
-        use canonical_derive::Canon;
-        use dusk_poseidon::sponge;
-        use crate::errors::BlindBidError;
-        use plonk_gadgets::{RangeGadgets::max_bound, ScalarGadgets::maybe_equal};
-        use plonk_gadgets::AllocatedScalar;
-        use dusk_plonk::prelude::*;
-    }
-}
+#[cfg(feature = "canon")]
+use canonical_derive::Canon;
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "std")] {
@@ -29,6 +21,10 @@ if #[cfg(feature = "std")] {
 use core::ops::Deref;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
+use dusk_plonk::prelude::*;
+use dusk_poseidon::sponge;
+use plonk_gadgets::AllocatedScalar;
+use plonk_gadgets::{RangeGadgets::max_bound, ScalarGadgets::maybe_equal};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "canon", derive(Canon))]
@@ -112,8 +108,8 @@ const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
 ]);
 
 impl Score {
-    #[cfg(all(feature = "std", feature = "canon"))]
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "canon"))))]
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     /// Given a `Bid`, compute it's Score and return it.
     pub fn compute(
         bid: &Bid,
@@ -177,8 +173,6 @@ impl Score {
 
     /// Proves that a `Score` is correctly generated.
     /// Prints the proving statements in the passed Constraint System.
-    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
-    #[cfg(feature = "canon")]
     pub fn prove_correct_score_gadget(
         &self,
         composer: &mut StandardComposer,
@@ -367,6 +361,7 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
     Ok(BlsScalar::from_bytes(&bytes).unwrap())
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,7 +397,6 @@ mod tests {
         .expect("Bid creation error")
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn biguint_scalar_conversion() {
         let rand_scalar = BlsScalar::random(&mut rand::thread_rng());
@@ -450,7 +444,6 @@ mod tests {
         )
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn correct_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters
@@ -550,7 +543,6 @@ mod tests {
         Ok(verifier.verify(&proof, &vk, &vec![BlsScalar::zero()])?)
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn incorrect_score_gen_proof() -> Result<(), BlindBidError> {
         // Generate Composer & Public Parameters

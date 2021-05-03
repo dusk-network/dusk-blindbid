@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
+#![cfg(feature = "std")]
 
 use super::tree_assets::BidTree;
 use crate::{Bid, BlindBidCircuit, Score, V_RAW_MAX, V_RAW_MIN};

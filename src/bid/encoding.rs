@@ -7,12 +7,17 @@
 //! Encoding module for Bid structure.
 //! See: <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>
 
+cfg_if::cfg_if! {
+if #[cfg(feature = "canon")] {
+       use alloc::vec::Vec;
+       use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
+       use dusk_plonk::prelude::*;
+    }
+}
+
 use super::Bid;
-use alloc::vec::Vec;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::Serializable;
-use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
-use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
 // 1. Generate the type_fields Scalar Id:
@@ -99,6 +104,8 @@ impl Into<BlsScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
+#[cfg(feature = "canon")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
     // TODO: We should switch to a different representation for this.
@@ -146,12 +153,12 @@ pub(crate) fn preimage_gadget(
     sponge::gadget(composer, &messages)
 }
 
+#[cfg(feature = "canon")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
-    use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
     fn random_bid(secret: &JubJubScalar) -> Bid {
@@ -187,7 +194,6 @@ mod tests {
         // the research side.
     }
 
-    #[cfg(feature = "canon")]
     #[test]
     fn bid_preimage_gadget() -> Result<(), Error> {
         // Generate Composer & Public Parameters
