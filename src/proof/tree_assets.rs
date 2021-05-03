@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
+#![cfg(feature = "canon")]
 
 use crate::Bid;
 use canonical_derive::Canon;
@@ -73,4 +74,5 @@ impl Keyed<u64> for BidLeaf {
     }
 }
 
-pub type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;
+#[allow(dead_code)]
+type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;
