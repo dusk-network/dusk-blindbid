@@ -8,9 +8,10 @@
 //! See: <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>
 
 #[cfg(feature = "canon")]
-use alloc::{vec, vec::Vec};
-#[cfg(feature = "canon")]
-use dusk_plonk::{constraint_system::ecc::Point as PlonkPoint, prelude::*};
+use {
+    alloc::{vec, vec::Vec},
+    dusk_plonk::{constraint_system::ecc::Point as PlonkPoint, prelude::*},
+};
 
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
