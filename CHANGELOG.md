@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `dusk-poseidon` from `0.18` to `0.21` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
 - Update `dusk-pki` from `0.6` to `0.7` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
 - Update `rand` from `0.7` to `0.8` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Change CIRCUIT_ID def to come from code-hasher [#139](https://github.com/dusk-network/dusk-blindbid/issues/139)
 
 ### Removed
 - Remove `anyhow` from the crate [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
