@@ -103,8 +103,8 @@ fn correct_blindbid_proof() -> Result<(), BlindBidError> {
     let pi: Vec<PublicInputValue> = vec![
         (*branch.root()).into(),
         storage_bid.into(),
-        bid.commitment().into(),
-        bid.hashed_secret().into(),
+        (*bid.commitment()).into(),
+        (*bid.hashed_secret()).into(),
         prover_id.into(),
         score.value().into(),
     ];
@@ -185,7 +185,7 @@ fn edited_score_blindbid_proof() -> Result<(), BlindBidError> {
         (*branch.root()).into(),
         storage_bid.into(),
         bid.c.into(),
-        bid.hashed_secret().into(),
+        (*bid.hashed_secret()).into(),
         prover_id.into(),
         score.value().into(),
     ];
@@ -268,7 +268,7 @@ fn edited_bid_value_blindbid_proof() -> Result<(), BlindBidError> {
         (*branch.root()).into(),
         storage_bid.into(),
         bid.c.into(),
-        bid.hashed_secret().into(),
+        (*bid.hashed_secret()).into(),
         prover_id.into(),
         score.value().into(),
     ];
@@ -370,7 +370,7 @@ fn expired_bid_proof() -> Result<(), BlindBidError> {
         (*branch.root()).into(),
         storage_bid.into(),
         bid.c.into(),
-        bid.hashed_secret().into(),
+        (*bid.hashed_secret()).into(),
         prover_id.into(),
         score.value().into(),
     ];
@@ -473,7 +473,7 @@ fn non_elegible_bid() -> Result<(), BlindBidError> {
         (*branch.root()).into(),
         storage_bid.into(),
         bid.c.into(),
-        bid.hashed_secret().into(),
+        (*bid.hashed_secret()).into(),
         prover_id.into(),
         score.value().into(),
     ];
