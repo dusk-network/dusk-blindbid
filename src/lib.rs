@@ -135,14 +135,17 @@
     html_root_url = "https://docs.rs/dusk-blindbid/0.0.0"
 )]
 
+extern crate alloc;
+
 pub(crate) mod bid;
 pub(crate) mod errors;
-#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
+#[cfg(feature = "canon")]
 pub(crate) mod proof;
 pub use bid::{Bid, Score};
 pub use errors::BlindBidError;
-#[cfg(all(feature = "std", feature = "canon"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "canon", feature = "std"))))]
+#[cfg(feature = "canon")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub use proof::BlindBidCircuit;
 /// The minimum amount of Dusk an user is permitted to bid.
 pub const V_RAW_MIN: u64 = 50_000u64;

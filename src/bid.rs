@@ -366,7 +366,6 @@ impl Bid {
     }
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod bid_serialization {
     use super::*;
