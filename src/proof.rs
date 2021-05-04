@@ -71,6 +71,7 @@ use dusk_poseidon::{
     tree::{merkle_opening as merkle_opening_gadget, PoseidonBranch},
 };
 use plonk_gadgets::{AllocatedScalar, RangeGadgets::max_bound};
+
 #[cfg(test)]
 mod bid_tests;
 #[cfg(test)]
@@ -125,8 +126,8 @@ pub struct BlindBidCircuit<'a> {
     pub secret: JubJubAffine,
 }
 
+#[code_hasher::hash(CIRCUIT_ID, version = "0.1.0")]
 impl<'a> Circuit for BlindBidCircuit<'a> {
-    const CIRCUIT_ID: [u8; 32] = [0xff; 32];
     fn gadget(&mut self, composer: &mut StandardComposer) -> Result<(), Error> {
         // Check if the inputs were indeed pre-loaded inside of the circuit
         // structure.
