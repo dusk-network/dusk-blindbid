@@ -33,6 +33,7 @@ canonical_derive = { version = "0.6", optional = true }
 rand = "0.8"
 dusk-bytes = "0.1"
 cfg-if = "1.0"
+code-hasher = "0.1"
 
 [dev-dependencies]
 microkelvin = "0.7"
