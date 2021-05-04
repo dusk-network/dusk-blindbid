@@ -5,10 +5,10 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
+#![cfg(all(feature = "std", feature = "canon"))]
 
 use super::tree_assets::BidTree;
-use crate::{Bid, BlindBidCircuit, Score, V_RAW_MAX, V_RAW_MIN};
-use dusk_bytes::Serializable;
+use crate::{Bid, BlindBidCircuit, BlindBidError, Score, V_RAW_MAX, V_RAW_MIN};
 use dusk_pki::{PublicSpendKey, SecretSpendKey};
 use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
 use dusk_plonk::prelude::*;
@@ -41,482 +41,450 @@ fn random_bid(secret: &JubJubScalar, secret_k: BlsScalar) -> Bid {
     .expect("Bid creation error")
 }
 
-#[cfg(test)]
-mod protocol_tests {
-    use super::*;
-    use crate::BlindBidError;
+#[test]
+fn correct_blindbid_proof() -> Result<(), BlindBidError> {
+    // Generate Composer & Public Parameters
+    let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-    #[test]
-    fn correct_blindbid_proof() -> Result<(), BlindBidError> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+    // Generate a BidTree and append the Bid.
+    let mut tree = BidTree::new();
 
-        // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new();
+    // Generate a correct Bid
+    let secret = JubJubScalar::random(&mut rand::thread_rng());
+    let secret_k = BlsScalar::random(&mut rand::thread_rng());
+    let bid = random_bid(&secret, secret_k);
+    let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
+    // Generate fields for the Bid & required by the compute_score
+    let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+    let latest_consensus_round = 50u64;
+    let latest_consensus_step = 50u64;
 
-        // Generate a correct Bid
-        let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let secret_k = BlsScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret, secret_k);
-        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
-        // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = 50u64;
-        let latest_consensus_step = 50u64;
+    // Append the Bid to the tree.
+    tree.push(bid.into())?;
 
-        // Append the Bid to the tree.
-        tree.push(bid.into())?;
+    // Extract the branch
+    let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
 
-        // Extract the branch
-        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
+    // Generate a `Score` for our Bid with the consensus parameters
+    let score = Score::compute(
+        &bid,
+        &secret,
+        secret_k,
+        *branch.root(),
+        consensus_round_seed,
+        latest_consensus_round,
+        latest_consensus_step,
+    )
+    .expect("Score computation Blinnd");
 
-        // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute(
-            &bid,
-            &secret,
-            secret_k,
-            *branch.root(),
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )
-        .expect("Score computation Blinnd");
+    let prover_id = bid.generate_prover_id(
+        secret_k,
+        BlsScalar::from(consensus_round_seed),
+        BlsScalar::from(latest_consensus_round),
+        BlsScalar::from(latest_consensus_step),
+    );
 
-        let prover_id = bid.generate_prover_id(
-            secret_k,
-            BlsScalar::from(consensus_round_seed),
-            BlsScalar::from(latest_consensus_round),
-            BlsScalar::from(latest_consensus_step),
-        );
+    let mut circuit = BlindBidCircuit {
+        bid,
+        score,
+        secret_k,
+        secret,
+        seed: BlsScalar::from(consensus_round_seed),
+        latest_consensus_round: BlsScalar::from(latest_consensus_round),
+        latest_consensus_step: BlsScalar::from(latest_consensus_step),
+        branch: &branch,
+    };
 
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score,
-            secret_k,
-            secret,
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
+    let (pk, vd) = circuit
+        .compile(&pub_params)
+        .expect("Circuit compilation Error");
+    let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
+    let storage_bid = bid.hash();
+    let pi: Vec<PublicInputValue> = vec![
+        (*branch.root()).into(),
+        storage_bid.into(),
+        bid.commitment().into(),
+        bid.hashed_secret().into(),
+        prover_id.into(),
+        score.value().into(),
+    ];
 
-        let (pk, vd) = circuit
-            .compile(&pub_params)
-            .expect("Circuit compilation Error");
-        let proof = circuit.gen_proof(&pub_params, &pk, b"CorrectBid")?;
-        let storage_bid = bid.hash();
-        let pi: Vec<PublicInputValue> = vec![
-            (*branch.root()).into(),
-            storage_bid.into(),
-            bid.commitment().into(),
-            bid.hashed_secret().into(),
-            prover_id.into(),
-            score.value().into(),
-        ];
-
-        Ok(circuit::verify_proof(
-            &pub_params,
-            &vd.key(),
-            &proof,
-            &pi,
-            &vd.pi_pos(),
-            b"CorrectBid",
-        )?)
-    }
-
-    #[test]
-    fn edited_score_blindbid_proof() -> Result<(), BlindBidError> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-
-        // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new();
-
-        // Generate a correct Bid
-        let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let secret_k = BlsScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret, secret_k);
-        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
-        // Generate fields for the Bid & required by the compute_score
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = 50u64;
-        let latest_consensus_step = 50u64;
-
-        // Append the Bid to the tree.
-        tree.push(bid.into())?;
-
-        // Extract the branch
-        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
-
-        // Generate a `Score` for our Bid with the consensus parameters
-        let mut score = Score::compute(
-            &bid,
-            &secret,
-            secret_k,
-            *branch.root(),
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )
-        .expect("Score computation error");
-
-        // Edit the Score so that we try to get a bigger one than the one we
-        // should have got.
-        score.value = score.value() + BlsScalar::from(100u64);
-        let prover_id = bid.generate_prover_id(
-            secret_k,
-            BlsScalar::from(consensus_round_seed),
-            BlsScalar::from(latest_consensus_round),
-            BlsScalar::from(latest_consensus_step),
-        );
-
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score,
-            secret_k,
-            secret,
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
-
-        let (pk, vd) = circuit
-            .compile(&pub_params)
-            .expect("Circuit compilation Error");
-        let proof =
-            circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
-        let storage_bid = bid.hash();
-        let pi: Vec<PublicInputValue> = vec![
-            (*branch.root()).into(),
-            storage_bid.into(),
-            bid.c.into(),
-            bid.hashed_secret().into(),
-            prover_id.into(),
-            score.value().into(),
-        ];
-        assert!(circuit::verify_proof(
-            &pub_params,
-            &vd.key(),
-            &proof,
-            &pi,
-            &vd.pi_pos(),
-            b"BidWithEditedScore"
-        )
-        .is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn edited_bid_value_blindbid_proof() -> Result<(), BlindBidError> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-
-        // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new();
-
-        // Generate a correct Bid
-        let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let secret_k = BlsScalar::random(&mut rand::thread_rng());
-        let mut bid = random_bid(&secret, secret_k);
-        let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
-        // Generate fields for the Bid & required by the compute_score
-        let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-        let latest_consensus_round = 25519u64;
-        let latest_consensus_step = 25519u64;
-
-        // Append the Bid to the tree.
-        tree.push(bid.into())?;
-
-        // Extract the branch
-        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
-
-        // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute(
-            &bid,
-            &secret,
-            secret_k,
-            bid_tree_root,
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )
-        .expect("Score computation error");
-
-        let prover_id = bid.generate_prover_id(
-            secret_k,
-            BlsScalar::from(consensus_round_seed),
-            BlsScalar::from(latest_consensus_round),
-            BlsScalar::from(latest_consensus_step),
-        );
-
-        // Edit the Bid in order to cheat and get a bigger Score/whatever.
-        bid.hashed_secret = BlsScalar::from(63463245u64);
-
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score,
-            secret_k,
-            secret,
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
-
-        let (pk, vd) = circuit
-            .compile(&pub_params)
-            .expect("Circuit compilation Error");
-        let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
-        let storage_bid = bid.hash();
-        let pi: Vec<PublicInputValue> = vec![
-            (*branch.root()).into(),
-            storage_bid.into(),
-            bid.c.into(),
-            bid.hashed_secret().into(),
-            prover_id.into(),
-            score.value().into(),
-        ];
-        assert!(circuit::verify_proof(
-            &pub_params,
-            &vd.key(),
-            &proof,
-            &pi,
-            &vd.pi_pos(),
-            b"EditedBidValue"
-        )
-        .is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn expired_bid_proof() -> Result<(), BlindBidError> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-
-        // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new();
-
-        // Create an expired bid.
-        let mut rng = rand::thread_rng();
-        let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
-        let stealth_addr = pk_r.gen_stealth_address(&secret);
-        let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
-        let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 =
-            (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
-        let value = JubJubScalar::from(value);
-        let expiration_ts = 100u64;
-        let elegibility_ts = 1000u64;
-        let bid = Bid::new(
-            &mut rng,
-            &stealth_addr,
-            &value,
-            &secret.into(),
-            secret_k,
-            elegibility_ts,
-            expiration_ts,
-        )
-        .expect("Bid creation error");
-
-        // Append the Bid to the tree.
-        tree.push(bid.into())?;
-
-        // Extract the branch
-        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
-
-        // We first generate the score as if the bid wasn't expired. Otherways
-        // the score generation would fail since the Bid would be expired.
-        let latest_consensus_round = 3u64;
-        let latest_consensus_step = 1u64;
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-
-        // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute(
-            &bid,
-            &secret,
-            secret_k,
-            *branch.root(),
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )
-        .expect("Score computation error");
-
-        // Latest consensus step should be lower than the expiration_ts, in this
-        // case is not so the proof should fail since the Bid is expired
-        // at this round.
-        let latest_consensus_round = 200u64;
-
-        let prover_id = bid.generate_prover_id(
-            secret_k,
-            BlsScalar::from(consensus_round_seed),
-            BlsScalar::from(latest_consensus_round),
-            BlsScalar::from(latest_consensus_step),
-        );
-
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score,
-            secret_k,
-            secret,
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
-
-        let (pk, vd) = circuit
-            .compile(&pub_params)
-            .expect("Circuit compilation Error");
-        let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
-        let storage_bid = bid.hash();
-        let pi: Vec<PublicInputValue> = vec![
-            (*branch.root()).into(),
-            storage_bid.into(),
-            bid.c.into(),
-            bid.hashed_secret().into(),
-            prover_id.into(),
-            score.value().into(),
-        ];
-        assert!(circuit::verify_proof(
-            &pub_params,
-            &vd.key(),
-            &proof,
-            &pi,
-            &vd.pi_pos(),
-            b"ExpiredBid"
-        )
-        .is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn non_elegible_bid() -> Result<(), BlindBidError> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
-
-        // Generate a BidTree and append the Bid.
-        let mut tree = BidTree::new();
-
-        // Create a non-elegible Bid.
-        let mut rng = rand::thread_rng();
-        let secret = JubJubScalar::random(&mut rng);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
-        let stealth_addr = pk_r.gen_stealth_address(&secret);
-        let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
-        let secret_k = BlsScalar::random(&mut rng);
-        let value: u64 =
-            (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
-        let value = JubJubScalar::from(value);
-        let expiration_ts = 100u64;
-        let elegibility_ts = 1000u64;
-        let bid = Bid::new(
-            &mut rng,
-            &stealth_addr,
-            &value,
-            &secret.into(),
-            secret_k,
-            elegibility_ts,
-            expiration_ts,
-        )
-        .expect("Bid creation error");
-
-        // Append the Bid to the tree.
-        tree.push(bid.into())?;
-
-        // Extract the branch
-        let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
-
-        // We first generate the score as if the bid was still eligible.
-        // Otherways the score generation would fail since the Bid
-        // wouldn't be elegible.
-        let latest_consensus_round = 3u64;
-        let latest_consensus_step = 1u64;
-        let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
-
-        // Generate a `Score` for our Bid with the consensus parameters
-        let score = Score::compute(
-            &bid,
-            &secret,
-            secret_k,
-            *branch.root(),
-            consensus_round_seed,
-            latest_consensus_round,
-            latest_consensus_step,
-        )
-        .expect("Score computation error");
-
-        let prover_id = bid.generate_prover_id(
-            secret_k,
-            BlsScalar::from(consensus_round_seed),
-            BlsScalar::from(latest_consensus_round),
-            BlsScalar::from(latest_consensus_step),
-        );
-
-        // Latest consensus step should be lower than the elegibility_ts, in
-        // this case is not so the proof should fail since the Bid is
-        // non elegible anymore.
-        let latest_consensus_round = 200u64;
-
-        let mut circuit = BlindBidCircuit {
-            bid,
-            score,
-            secret_k,
-            secret,
-            seed: BlsScalar::from(consensus_round_seed),
-            latest_consensus_round: BlsScalar::from(latest_consensus_round),
-            latest_consensus_step: BlsScalar::from(latest_consensus_step),
-            branch: &branch,
-        };
-
-        let (pk, vd) = circuit
-            .compile(&pub_params)
-            .expect("Circuit compilation Error");
-        let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
-        let storage_bid = bid.hash();
-        let pi: Vec<PublicInputValue> = vec![
-            (*branch.root()).into(),
-            storage_bid.into(),
-            bid.c.into(),
-            bid.hashed_secret().into(),
-            prover_id.into(),
-            score.value().into(),
-        ];
-        assert!(circuit::verify_proof(
-            &pub_params,
-            &vd.key(),
-            &proof,
-            &pi,
-            &vd.pi_pos(),
-            b"NonElegibleBid"
-        )
-        .is_err());
-        Ok(())
-    }
+    Ok(circuit::verify_proof(
+        &pub_params,
+        &vd.key(),
+        &proof,
+        &pi,
+        &vd.pi_pos(),
+        b"CorrectBid",
+    )?)
 }
 
-#[cfg(test)]
-mod serialization_tests {
-    use super::*;
-    use crate::BlindBidError;
-    use core::result::Result;
+#[test]
+fn edited_score_blindbid_proof() -> Result<(), BlindBidError> {
+    // Generate Composer & Public Parameters
+    let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
 
-    #[test]
-    fn from_to_bytes_impl_works() -> Result<(), BlindBidError> {
-        let bid = random_bid(&JubJubScalar::one(), BlsScalar::one());
-        let bid_hash = bid.hash();
-        let bytes = bid.to_bytes();
-        let bid2 = Bid::from_bytes(&bytes)?;
-        let bid_hash_2 = bid2.hash();
-        assert_eq!(bid_hash.0, bid_hash_2.0);
-        Ok(())
-    }
+    // Generate a BidTree and append the Bid.
+    let mut tree = BidTree::new();
+
+    // Generate a correct Bid
+    let secret = JubJubScalar::random(&mut rand::thread_rng());
+    let secret_k = BlsScalar::random(&mut rand::thread_rng());
+    let bid = random_bid(&secret, secret_k);
+    let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
+    // Generate fields for the Bid & required by the compute_score
+    let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+    let latest_consensus_round = 50u64;
+    let latest_consensus_step = 50u64;
+
+    // Append the Bid to the tree.
+    tree.push(bid.into())?;
+
+    // Extract the branch
+    let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
+
+    // Generate a `Score` for our Bid with the consensus parameters
+    let mut score = Score::compute(
+        &bid,
+        &secret,
+        secret_k,
+        *branch.root(),
+        consensus_round_seed,
+        latest_consensus_round,
+        latest_consensus_step,
+    )
+    .expect("Score computation error");
+
+    // Edit the Score so that we try to get a bigger one than the one we
+    // should have got.
+    score.value = score.value() + BlsScalar::from(100u64);
+    let prover_id = bid.generate_prover_id(
+        secret_k,
+        BlsScalar::from(consensus_round_seed),
+        BlsScalar::from(latest_consensus_round),
+        BlsScalar::from(latest_consensus_step),
+    );
+
+    let mut circuit = BlindBidCircuit {
+        bid,
+        score,
+        secret_k,
+        secret,
+        seed: BlsScalar::from(consensus_round_seed),
+        latest_consensus_round: BlsScalar::from(latest_consensus_round),
+        latest_consensus_step: BlsScalar::from(latest_consensus_step),
+        branch: &branch,
+    };
+
+    let (pk, vd) = circuit
+        .compile(&pub_params)
+        .expect("Circuit compilation Error");
+    let proof = circuit.gen_proof(&pub_params, &pk, b"BidWithEditedScore")?;
+    let storage_bid = bid.hash();
+    let pi: Vec<PublicInputValue> = vec![
+        (*branch.root()).into(),
+        storage_bid.into(),
+        bid.c.into(),
+        bid.hashed_secret().into(),
+        prover_id.into(),
+        score.value().into(),
+    ];
+    assert!(circuit::verify_proof(
+        &pub_params,
+        &vd.key(),
+        &proof,
+        &pi,
+        &vd.pi_pos(),
+        b"BidWithEditedScore"
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn edited_bid_value_blindbid_proof() -> Result<(), BlindBidError> {
+    // Generate Composer & Public Parameters
+    let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+
+    // Generate a BidTree and append the Bid.
+    let mut tree = BidTree::new();
+
+    // Generate a correct Bid
+    let secret = JubJubScalar::random(&mut rand::thread_rng());
+    let secret_k = BlsScalar::random(&mut rand::thread_rng());
+    let mut bid = random_bid(&secret, secret_k);
+    let secret: JubJubAffine = (GENERATOR_EXTENDED * &secret).into();
+    // Generate fields for the Bid & required by the compute_score
+    let bid_tree_root = BlsScalar::random(&mut rand::thread_rng());
+    let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+    let latest_consensus_round = 25519u64;
+    let latest_consensus_step = 25519u64;
+
+    // Append the Bid to the tree.
+    tree.push(bid.into())?;
+
+    // Extract the branch
+    let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
+
+    // Generate a `Score` for our Bid with the consensus parameters
+    let score = Score::compute(
+        &bid,
+        &secret,
+        secret_k,
+        bid_tree_root,
+        consensus_round_seed,
+        latest_consensus_round,
+        latest_consensus_step,
+    )
+    .expect("Score computation error");
+
+    let prover_id = bid.generate_prover_id(
+        secret_k,
+        BlsScalar::from(consensus_round_seed),
+        BlsScalar::from(latest_consensus_round),
+        BlsScalar::from(latest_consensus_step),
+    );
+
+    // Edit the Bid in order to cheat and get a bigger Score/whatever.
+    bid.hashed_secret = BlsScalar::from(63463245u64);
+
+    let mut circuit = BlindBidCircuit {
+        bid,
+        score,
+        secret_k,
+        secret,
+        seed: BlsScalar::from(consensus_round_seed),
+        latest_consensus_round: BlsScalar::from(latest_consensus_round),
+        latest_consensus_step: BlsScalar::from(latest_consensus_step),
+        branch: &branch,
+    };
+
+    let (pk, vd) = circuit
+        .compile(&pub_params)
+        .expect("Circuit compilation Error");
+    let proof = circuit.gen_proof(&pub_params, &pk, b"EditedBidValue")?;
+    let storage_bid = bid.hash();
+    let pi: Vec<PublicInputValue> = vec![
+        (*branch.root()).into(),
+        storage_bid.into(),
+        bid.c.into(),
+        bid.hashed_secret().into(),
+        prover_id.into(),
+        score.value().into(),
+    ];
+    assert!(circuit::verify_proof(
+        &pub_params,
+        &vd.key(),
+        &proof,
+        &pi,
+        &vd.pi_pos(),
+        b"EditedBidValue"
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn expired_bid_proof() -> Result<(), BlindBidError> {
+    // Generate Composer & Public Parameters
+    let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+
+    // Generate a BidTree and append the Bid.
+    let mut tree = BidTree::new();
+
+    // Create an expired bid.
+    let mut rng = rand::thread_rng();
+    let secret = JubJubScalar::random(&mut rng);
+    let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
+    let stealth_addr = pk_r.gen_stealth_address(&secret);
+    let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
+    let secret_k = BlsScalar::random(&mut rng);
+    let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
+    let value = JubJubScalar::from(value);
+    let expiration_ts = 100u64;
+    let elegibility_ts = 1000u64;
+    let bid = Bid::new(
+        &mut rng,
+        &stealth_addr,
+        &value,
+        &secret.into(),
+        secret_k,
+        elegibility_ts,
+        expiration_ts,
+    )
+    .expect("Bid creation error");
+
+    // Append the Bid to the tree.
+    tree.push(bid.into())?;
+
+    // Extract the branch
+    let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
+
+    // We first generate the score as if the bid wasn't expired. Otherways
+    // the score generation would fail since the Bid would be expired.
+    let latest_consensus_round = 3u64;
+    let latest_consensus_step = 1u64;
+    let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+
+    // Generate a `Score` for our Bid with the consensus parameters
+    let score = Score::compute(
+        &bid,
+        &secret,
+        secret_k,
+        *branch.root(),
+        consensus_round_seed,
+        latest_consensus_round,
+        latest_consensus_step,
+    )
+    .expect("Score computation error");
+
+    // Latest consensus step should be lower than the expiration_ts, in this
+    // case is not so the proof should fail since the Bid is expired
+    // at this round.
+    let latest_consensus_round = 200u64;
+
+    let prover_id = bid.generate_prover_id(
+        secret_k,
+        BlsScalar::from(consensus_round_seed),
+        BlsScalar::from(latest_consensus_round),
+        BlsScalar::from(latest_consensus_step),
+    );
+
+    let mut circuit = BlindBidCircuit {
+        bid,
+        score,
+        secret_k,
+        secret,
+        seed: BlsScalar::from(consensus_round_seed),
+        latest_consensus_round: BlsScalar::from(latest_consensus_round),
+        latest_consensus_step: BlsScalar::from(latest_consensus_step),
+        branch: &branch,
+    };
+
+    let (pk, vd) = circuit
+        .compile(&pub_params)
+        .expect("Circuit compilation Error");
+    let proof = circuit.gen_proof(&pub_params, &pk, b"ExpiredBid")?;
+    let storage_bid = bid.hash();
+    let pi: Vec<PublicInputValue> = vec![
+        (*branch.root()).into(),
+        storage_bid.into(),
+        bid.c.into(),
+        bid.hashed_secret().into(),
+        prover_id.into(),
+        score.value().into(),
+    ];
+    assert!(circuit::verify_proof(
+        &pub_params,
+        &vd.key(),
+        &proof,
+        &pi,
+        &vd.pi_pos(),
+        b"ExpiredBid"
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn non_elegible_bid() -> Result<(), BlindBidError> {
+    // Generate Composer & Public Parameters
+    let pub_params = PublicParameters::setup(1 << 17, &mut rand::thread_rng())?;
+
+    // Generate a BidTree and append the Bid.
+    let mut tree = BidTree::new();
+
+    // Create a non-elegible Bid.
+    let mut rng = rand::thread_rng();
+    let secret = JubJubScalar::random(&mut rng);
+    let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
+    let stealth_addr = pk_r.gen_stealth_address(&secret);
+    let secret = JubJubAffine::from(GENERATOR_EXTENDED * secret);
+    let secret_k = BlsScalar::random(&mut rng);
+    let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
+    let value = JubJubScalar::from(value);
+    let expiration_ts = 100u64;
+    let elegibility_ts = 1000u64;
+    let bid = Bid::new(
+        &mut rng,
+        &stealth_addr,
+        &value,
+        &secret.into(),
+        secret_k,
+        elegibility_ts,
+        expiration_ts,
+    )
+    .expect("Bid creation error");
+
+    // Append the Bid to the tree.
+    tree.push(bid.into())?;
+
+    // Extract the branch
+    let branch = tree.branch(0)?.expect("Poseidon Branch Extraction");
+
+    // We first generate the score as if the bid was still eligible.
+    // Otherways the score generation would fail since the Bid
+    // wouldn't be elegible.
+    let latest_consensus_round = 3u64;
+    let latest_consensus_step = 1u64;
+    let consensus_round_seed = BlsScalar::random(&mut rand::thread_rng());
+
+    // Generate a `Score` for our Bid with the consensus parameters
+    let score = Score::compute(
+        &bid,
+        &secret,
+        secret_k,
+        *branch.root(),
+        consensus_round_seed,
+        latest_consensus_round,
+        latest_consensus_step,
+    )
+    .expect("Score computation error");
+
+    let prover_id = bid.generate_prover_id(
+        secret_k,
+        BlsScalar::from(consensus_round_seed),
+        BlsScalar::from(latest_consensus_round),
+        BlsScalar::from(latest_consensus_step),
+    );
+
+    // Latest consensus step should be lower than the elegibility_ts, in
+    // this case is not so the proof should fail since the Bid is
+    // non elegible anymore.
+    let latest_consensus_round = 200u64;
+
+    let mut circuit = BlindBidCircuit {
+        bid,
+        score,
+        secret_k,
+        secret,
+        seed: BlsScalar::from(consensus_round_seed),
+        latest_consensus_round: BlsScalar::from(latest_consensus_round),
+        latest_consensus_step: BlsScalar::from(latest_consensus_step),
+        branch: &branch,
+    };
+
+    let (pk, vd) = circuit
+        .compile(&pub_params)
+        .expect("Circuit compilation Error");
+    let proof = circuit.gen_proof(&pub_params, &pk, b"NonElegibleBid")?;
+    let storage_bid = bid.hash();
+    let pi: Vec<PublicInputValue> = vec![
+        (*branch.root()).into(),
+        storage_bid.into(),
+        bid.c.into(),
+        bid.hashed_secret().into(),
+        prover_id.into(),
+        score.value().into(),
+    ];
+    assert!(circuit::verify_proof(
+        &pub_params,
+        &vd.key(),
+        &proof,
+        &pi,
+        &vd.pi_pos(),
+        b"NonElegibleBid"
+    )
+    .is_err());
+    Ok(())
 }

@@ -7,13 +7,14 @@
 //! Encoding module for Bid structure.
 //! See: <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>
 
+#[cfg(feature = "canon")]
+use alloc::{vec, vec::Vec};
+#[cfg(feature = "canon")]
+use dusk_plonk::{constraint_system::ecc::Point as PlonkPoint, prelude::*};
+
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::Serializable;
-#[cfg(feature = "std")]
-use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
-#[cfg(feature = "std")]
-use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
 // 1. Generate the type_fields Scalar Id:
@@ -100,7 +101,7 @@ impl Into<BlsScalar> for Bid {
 /// Hashes the internal Bid parameters using the Poseidon hash
 /// function and the cannonical encoding for hashing returning a
 /// Variable which contains the hash of the Bid.
-#[cfg(feature = "std")]
+#[cfg(feature = "canon")]
 #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 pub(crate) fn preimage_gadget(
     composer: &mut StandardComposer,
@@ -123,33 +124,33 @@ pub(crate) fn preimage_gadget(
     let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
 
     // Add to the composer the values required for the preimage.
-    let mut messages: Vec<Variable> = vec![];
-    messages.push(composer.add_input(type_fields));
-    // Push cipher as scalars.
-    messages.push(encrypted_data.0);
-    messages.push(encrypted_data.1);
-
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*stealth_addr.0.x());
-    messages.push(*stealth_addr.0.y());
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*stealth_addr.1.x());
-    messages.push(*stealth_addr.1.y());
-    messages.push(hashed_secret);
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*commitment.x());
-    messages.push(*commitment.y());
-    // Add elebility & expiration timestamps.
-    messages.push(eligibility);
-    messages.push(expiration);
-    // Add position of the bid in the BidTree
-    messages.push(pos);
+    let messages: Vec<Variable> = vec![
+        composer.add_input(type_fields),
+        // Push cipher as scalars.
+        encrypted_data.0,
+        encrypted_data.1,
+        // Push both JubJubAffine coordinates as a Scalar.
+        *stealth_addr.0.x(),
+        *stealth_addr.0.y(),
+        // Push both JubJubAffine coordinates as a Scalar.
+        *stealth_addr.1.x(),
+        *stealth_addr.1.y(),
+        hashed_secret,
+        // Push both JubJubAffine coordinates as a Scalar.
+        *commitment.x(),
+        *commitment.y(),
+        // Add elebility & expiration timestamps.
+        eligibility,
+        expiration,
+        // Add position of the bid in the BidTree
+        pos,
+    ];
 
     // Perform the sponge_hash inside of the Constraint System
     sponge::gadget(composer, &messages)
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "canon")]
 #[cfg(test)]
 mod tests {
     use super::*;

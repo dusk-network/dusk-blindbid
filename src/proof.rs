@@ -104,7 +104,7 @@ mod tree_assets;
 /// // Assuming we got a proof from somewhere which we want to verify.
 /// circuit::verify_proof(&pub_params, &vd.key(), &proof, &pi, &vd.pi_pos(), b"CorrectnessBid")
 /// ```
-#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "canon"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
 #[derive(Debug, Clone)]
 pub struct BlindBidCircuit<'a> {
     /// Bid used to generate the score

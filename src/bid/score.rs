@@ -4,37 +4,34 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Score generation
+//! Score generation module
 
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
-        use crate::errors::BlindBidError;
-        use crate::bid::Bid;
-        use dusk_jubjub::JubJubAffine;
-        use dusk_plonk::prelude::*;
-        use num_bigint::BigUint;
-        use num_traits::{One, Zero};
-        use dusk_poseidon::sponge;
-        use plonk_gadgets::{
-            AllocatedScalar, RangeGadgets::max_bound, ScalarGadgets::maybe_equal,
-        };
-    }
-}
+#[cfg(feature = "std")]
+use {
+    crate::bid::{Bid, BlindBidError},
+    dusk_jubjub::JubJubAffine,
+    num_bigint::BigUint,
+    num_traits::{One, Zero},
+};
 
 use core::ops::Deref;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
+use dusk_plonk::constraint_system::{StandardComposer, Variable};
+use dusk_poseidon::sponge;
+use plonk_gadgets::AllocatedScalar;
+use plonk_gadgets::{RangeGadgets::max_bound, ScalarGadgets::maybe_equal};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
-#[cfg_attr(feature = "canon", derive(Canon))]
 /// The `Score` represents a "random" value obtained from the computations
-/// based on blockchain data as well as [Bid](self::Bid) data.
+/// based on blockchain data as well as [Bid](crate::Bid) data.
 /// It derefs to it's value although the structure contains more fields which
 /// are side-results of this computation needed to proof the correctness of the
 /// Score generation process later on.
+#[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Score {
     pub(crate) value: BlsScalar,
     y: BlsScalar,
@@ -95,27 +92,24 @@ impl Score {
     }
 }
 
-#[cfg(feature = "std")]
-pub(self) const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar =
-    BlsScalar::from_raw([
-        0x3339d80809a1d805,
-        0x73eda753299d7d48,
-        0x0000000000000000,
-        0x0000000000000000,
-    ]);
+const SCALAR_FIELD_ORD_DIV_2_POW_128: BlsScalar = BlsScalar::from_raw([
+    0x3339d80809a1d805,
+    0x73eda753299d7d48,
+    0x0000000000000000,
+    0x0000000000000000,
+]);
 
-#[cfg(feature = "std")]
-pub(self) const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
+const MINUS_ONE_MOD_2_POW_128: BlsScalar = BlsScalar::from_raw([
     0xffffffff00000000,
     0x53bda402fffe5bfe,
     0x0000000000000000,
     0x0000000000000000,
 ]);
 
-#[cfg(feature = "std")]
 impl Score {
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     /// Given a `Bid`, compute it's Score and return it.
-    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
     pub fn compute(
         bid: &Bid,
         secret: &JubJubAffine,
@@ -178,7 +172,6 @@ impl Score {
 
     /// Proves that a `Score` is correctly generated.
     /// Prints the proving statements in the passed Constraint System.
-    #[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
     pub fn prove_correct_score_gadget(
         &self,
         composer: &mut StandardComposer,
@@ -371,10 +364,11 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BlindBidError;
-    use dusk_bytes::Serializable;
+    use crate::Bid;
     use dusk_pki::{PublicSpendKey, SecretSpendKey};
     use dusk_plonk::jubjub::GENERATOR_EXTENDED;
+    use dusk_plonk::prelude::*;
+    use plonk_gadgets::AllocatedScalar;
     use rand::Rng;
 
     fn random_bid(secret: &JubJubScalar) -> Bid {
