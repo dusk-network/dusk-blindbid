@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 #![allow(non_snake_case)]
+#![cfg(feature = "canon")]
 
 use crate::Bid;
 use canonical_derive::Canon;
@@ -58,8 +59,8 @@ impl PoseidonLeaf for BidLeaf {
         self.0.hash()
     }
 
-    fn pos(&self) -> u64 {
-        *self.0.pos()
+    fn pos(&self) -> &u64 {
+        self.0.pos()
     }
 
     fn set_pos(&mut self, pos: u64) {
@@ -73,4 +74,5 @@ impl Keyed<u64> for BidLeaf {
     }
 }
 
+#[allow(dead_code)]
 pub type BidTree = PoseidonTree<BidLeaf, PoseidonMaxAnnotation, 17>;

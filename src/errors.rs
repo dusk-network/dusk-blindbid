@@ -6,10 +6,11 @@
 
 //! Errors related to the BlindBid module
 
+use core::fmt;
 use dusk_bytes::Error as DuskBytesError;
 use dusk_jubjub::JubJubScalar;
-#[cfg(feature = "std")]
-use std::fmt;
+use dusk_plonk::error::Error as PlonkError;
+use dusk_poseidon::Error as PoseidonError;
 
 #[derive(Debug)]
 /// Compilation of the erros that blindbid procedures might end up producing.
@@ -42,9 +43,12 @@ pub enum BlindBidError {
     IOError,
     /// Dusk-bytes serialization error
     SerializationError(DuskBytesError),
+    /// Plonk lib error
+    PlonkError(PlonkError),
+    /// Poseidon lib error
+    PoseidonError(PoseidonError),
 }
 
-#[cfg(feature = "std")]
 impl fmt::Display for BlindBidError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Bid Generation Error: {:?}", &self)
@@ -64,5 +68,17 @@ impl From<BlindBidError> for std::io::Error {
 impl From<DuskBytesError> for BlindBidError {
     fn from(bytes_err: DuskBytesError) -> Self {
         Self::SerializationError(bytes_err)
+    }
+}
+
+impl From<PlonkError> for BlindBidError {
+    fn from(plonk_err: PlonkError) -> Self {
+        Self::PlonkError(plonk_err)
+    }
+}
+
+impl From<PoseidonError> for BlindBidError {
+    fn from(poseidon_err: PoseidonError) -> Self {
+        Self::PoseidonError(poseidon_err)
     }
 }
