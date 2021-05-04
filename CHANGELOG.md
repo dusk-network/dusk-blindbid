@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change error module to include plonk & poseidon err variants [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
 - Change crate features to not require `std` to use `proof` mod. [#135](https://github.com/dusk-network/dusk-blindbid/issues/135)
 - Change API getters returning by ref and not by value. [#124](https://github.com/dusk-network/dusk-blindbid/issues/124)
+- Update `canonical` from `0.5` to `0.6` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Update `dusk-plonk` from `0.6` to `0.8` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Update `plonk_gadgets` from `0.5` to `0.6` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Update `dusk-poseidon` from `0.18` to `0.21` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Update `dusk-pki` from `0.6` to `0.7` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
+- Update `rand` from `0.7` to `0.8` [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
 
 ### Removed
 - Remove `anyhow` from the crate [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
