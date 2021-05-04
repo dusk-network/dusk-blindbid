@@ -58,8 +58,8 @@ impl PoseidonLeaf for BidLeaf {
         self.0.hash()
     }
 
-    fn pos(&self) -> u64 {
-        *self.0.pos()
+    fn pos(&self) -> &u64 {
+        self.0.pos()
     }
 
     fn set_pos(&mut self, pos: u64) {
