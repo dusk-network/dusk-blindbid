@@ -145,23 +145,23 @@ impl<'a> Circuit for BlindBidCircuit<'a> {
         let bid_hash = AllocatedScalar::allocate(composer, storage_bid);
         // Allocate Bid-internal fields
         let bid_hashed_secret =
-            AllocatedScalar::allocate(composer, bid.hashed_secret());
+            AllocatedScalar::allocate(composer, *bid.hashed_secret());
         let bid_cipher = (
             composer.add_input(bid.encrypted_data().cipher()[0]),
             composer.add_input(bid.encrypted_data().cipher()[1]),
         );
-        let bid_commitment = composer.add_affine(bid.commitment());
+        let bid_commitment = composer.add_affine(*bid.commitment());
         let bid_stealth_addr = (
             composer.add_affine(bid.stealth_address().pk_r().as_ref().into()),
             composer.add_affine(bid.stealth_address().R().into()),
         );
         let bid_eligibility_ts = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.eligibility()),
+            BlsScalar::from(*bid.eligibility()),
         );
         let bid_expiration = AllocatedScalar::allocate(
             composer,
-            BlsScalar::from(bid.expiration()),
+            BlsScalar::from(*bid.expiration()),
         );
         let pos =
             AllocatedScalar::allocate(composer, BlsScalar::from(*bid.pos()));
@@ -285,7 +285,7 @@ impl<'a> Circuit for BlindBidCircuit<'a> {
         let computed_c = composer.point_addition_gate(p1, p2);
 
         // Assert computed_commitment == announced commitment.
-        composer.assert_equal_public_point(computed_c, bid.commitment());
+        composer.assert_equal_public_point(computed_c, *bid.commitment());
 
         // 6. 0 < value <= 2^64 range check
         // v < 2^64
