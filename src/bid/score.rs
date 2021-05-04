@@ -9,14 +9,13 @@
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
 
-cfg_if::cfg_if! {
-if #[cfg(feature = "std")] {
-        use num_bigint::BigUint;
-        use num_traits::{One, Zero};
-        use dusk_jubjub::JubJubAffine;
-        use crate::bid::{Bid, BlindBidError};
-    }
-}
+#[cfg(feature = "std")]
+use {
+    crate::bid::{Bid, BlindBidError},
+    dusk_jubjub::JubJubAffine,
+    num_bigint::BigUint,
+    num_traits::{One, Zero},
+};
 
 use core::ops::Deref;
 use dusk_bls12_381::BlsScalar;
