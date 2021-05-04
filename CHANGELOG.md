@@ -8,32 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Refactor error module to include plonk & poseidon err variants. [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
+- Change error module to include plonk & poseidon err variants [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
 
 ### Removed
-- Remove `anyhow` from the crate. [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
+- Remove `anyhow` from the crate [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
 
 ## [0.7.1] - 22-02-21
 
 ### Added
 
-- Added `set_eligibility` for `Bid`. [#125](https://github.com/dusk-network/dusk-blindbid/issues/125)
+- Add `set_eligibility` for `Bid` [#125](https://github.com/dusk-network/dusk-blindbid/issues/125)
 
 ## [0.7.0] - 17-02-21
 
 ### Added
 
-- Added `extend_expiration()` for `Bid`. [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
+- Add `extend_expiration()` for `Bid` [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
 
 ### Changed
 
-- Changed `Bid::set_pos()` to not return `&mut u64`. [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
+- Change `Bid::set_pos()` to not return `&mut u64` [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
 
 ## [0.6.0] - 12-02-21
 
 ### Changed
 
-- Use crates.io deps for `dusk-pki` and `plonk_gadgets` now that they're published.[#116](https://github.com/dusk-network/dusk-blindbid/issues/116)
+- Use crates.io deps for `dusk-pki` and `plonk_gadgets` now that they're published [#116](https://github.com/dusk-network/dusk-blindbid/issues/116)
 - Improve naming for `Score` gen function [#118](https://github.com/dusk-network/dusk-blindbid/issues/118)
 - Consensus round seed as BlsScalar instead of u64 [#113](https://github.com/dusk-network/dusk-blindbid/issues/113)
 
