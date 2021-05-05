@@ -30,7 +30,7 @@ use dusk_bytes::{DeserializableSlice, Serializable};
 /// Score generation process later on.
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Score {
-    pub(crate) value: BlsScalar,
+    value: BlsScalar,
     y: BlsScalar,
     y_prime: BlsScalar,
     r1: BlsScalar,
@@ -83,9 +83,25 @@ impl Serializable<{ 5 * BlsScalar::SIZE }> for Score {
 }
 
 impl Score {
-    /// Returns the value of the [Score](self::Score)
-    pub fn value(&self) -> BlsScalar {
-        self.value
+    /// Returns the `r1` value of the `Score`.
+    pub fn r1(&self) -> &BlsScalar {
+        &self.r1
+    }
+    /// Returns the `r2` value of the `Score`.
+    pub fn r2(&self) -> &BlsScalar {
+        &self.r2
+    }
+    /// Returns the `y` value of the `Score`.
+    pub fn y(&self) -> &BlsScalar {
+        &self.y
+    }
+    /// Returns the `y_prime` value of the `Score`.
+    pub fn y_prime(&self) -> &BlsScalar {
+        &self.y_prime
+    }
+    /// Returns the value of the `Score`.
+    pub fn value(&self) -> &BlsScalar {
+        &self.value
     }
 }
 
