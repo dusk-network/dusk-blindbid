@@ -84,23 +84,23 @@ impl Serializable<{ 5 * BlsScalar::SIZE }> for Score {
 
 impl Score {
     /// Returns the `r1` value of the `Score`.
-    pub fn r1(&self) -> &BlsScalar {
+    pub const fn r1(&self) -> &BlsScalar {
         &self.r1
     }
     /// Returns the `r2` value of the `Score`.
-    pub fn r2(&self) -> &BlsScalar {
+    pub const fn r2(&self) -> &BlsScalar {
         &self.r2
     }
     /// Returns the `y` value of the `Score`.
-    pub fn y(&self) -> &BlsScalar {
+    pub const fn y(&self) -> &BlsScalar {
         &self.y
     }
     /// Returns the `y_prime` value of the `Score`.
-    pub fn y_prime(&self) -> &BlsScalar {
+    pub const fn y_prime(&self) -> &BlsScalar {
         &self.y_prime
     }
     /// Returns the value of the `Score`.
-    pub fn value(&self) -> &BlsScalar {
+    pub const fn value(&self) -> &BlsScalar {
         &self.value
     }
 }
