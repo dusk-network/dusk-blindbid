@@ -139,14 +139,9 @@ extern crate alloc;
 
 pub(crate) mod bid;
 pub(crate) mod errors;
-#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
-#[cfg(feature = "canon")]
-pub(crate) mod proof;
 pub use bid::{Bid, Score};
 pub use errors::BlindBidError;
-#[cfg(feature = "canon")]
-#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
-pub use proof::BlindBidCircuit;
+
 /// The minimum amount of Dusk an user is permitted to bid.
 pub const V_RAW_MIN: u64 = 50_000u64;
 /// The maximum amount of Dusk an user is permitted to bid.
