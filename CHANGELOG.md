@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Remove `anyhow` from the crate [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
+- Remove ZK-related components from the crate [#141](https://github.com/dusk-network/dusk-blindbid/issues/141)
 
 ## [0.7.1] - 22-02-21
 

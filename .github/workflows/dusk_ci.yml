@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release --features std
+          args: --release 
 
   test_nightly_nostd:
     name: Nightly tests no_std

@@ -9,7 +9,6 @@
 use core::fmt;
 use dusk_bytes::Error as DuskBytesError;
 use dusk_jubjub::JubJubScalar;
-use dusk_plonk::error::Error as PlonkError;
 use dusk_poseidon::Error as PoseidonError;
 
 #[derive(Debug)]
@@ -43,8 +42,6 @@ pub enum BlindBidError {
     IOError,
     /// Dusk-bytes serialization error
     SerializationError(DuskBytesError),
-    /// Plonk lib error
-    PlonkError(PlonkError),
     /// Poseidon lib error
     PoseidonError(PoseidonError),
 }
@@ -68,12 +65,6 @@ impl From<BlindBidError> for std::io::Error {
 impl From<DuskBytesError> for BlindBidError {
     fn from(bytes_err: DuskBytesError) -> Self {
         Self::SerializationError(bytes_err)
-    }
-}
-
-impl From<PlonkError> for BlindBidError {
-    fn from(plonk_err: PlonkError) -> Self {
-        Self::PlonkError(plonk_err)
     }
 }
 
