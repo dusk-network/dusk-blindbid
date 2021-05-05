@@ -34,7 +34,7 @@ cfg-if = "1.0"
 
 
 [features]
-default = ["canon"]
+default = ["canon", "std"]
 std = [
     "dusk-jubjub/std",
     "dusk-bls12_381/std",
