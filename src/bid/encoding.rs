@@ -22,7 +22,13 @@ use dusk_poseidon::sponge;
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different
 // structures
-const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
+
+/// Following the guidelines for Poseidon Hashing proving statements generation
+/// given in <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>, we export the field types const which
+/// will be needed by the gadgets that want to implement the hash of a [`Bid`]
+/// inside of a Circuit.
+pub const BID_HASHING_TYPE_FIELDS: [u8; 32] =
+    *b"53313116000000000000000000000000";
 
 impl Bid {
     /// Return the Bid as a set of "hasheable" parameters which is directly
@@ -36,7 +42,8 @@ impl Bid {
         // neither used to obtain this encoded form.
 
         // Safe unwrap here.
-        let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
+        let type_fields =
+            BlsScalar::from_bytes(&BID_HASHING_TYPE_FIELDS).unwrap();
         words_deposit[0] = type_fields;
 
         // 2. Encode each word.

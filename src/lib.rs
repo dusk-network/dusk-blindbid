@@ -161,7 +161,7 @@ extern crate alloc;
 
 pub(crate) mod bid;
 pub(crate) mod errors;
-pub use bid::{Bid, Score};
+pub use bid::{encoding::BID_HASHING_TYPE_FIELDS, Bid, Score};
 pub use errors::BlindBidError;
 
 /// The minimum amount of Dusk an user is permitted to bid.
