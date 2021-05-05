@@ -1,6 +1,6 @@
 [package]
 name = "dusk-blindbid"
-version = "0.7.1"
+version = "0.8.0-rc.0"
 authors = ["CPerezz <carlos@dusk.network>", "Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 license = "MPL-2.0"
