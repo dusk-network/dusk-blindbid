@@ -13,6 +13,7 @@ use canonical_derive::Canon;
 use {
     crate::bid::{Bid, BlindBidError},
     dusk_jubjub::JubJubAffine,
+    dusk_poseidon::sponge,
     num_bigint::BigUint,
     num_traits::{One, Zero},
 };
@@ -170,12 +171,6 @@ fn biguint_to_scalar(biguint: BigUint) -> Result<BlsScalar, BlindBidError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Bid;
-    use dusk_pki::{PublicSpendKey, SecretSpendKey};
-    use dusk_plonk::jubjub::GENERATOR_EXTENDED;
-    use dusk_plonk::prelude::*;
-    use plonk_gadgets::AllocatedScalar;
-    use rand::Rng;
 
     #[test]
     fn biguint_scalar_conversion() {
