@@ -65,6 +65,7 @@
 //! // The next step is only doable if `std` feature is enabled.
 //!
 //! // Generate a `Score` for our Bid with the consensus parameters
+//! #[cfg(feature = "std")]
 //!  let score = Score::compute(
 //!      &bid,
 //!      &secret.into(),
