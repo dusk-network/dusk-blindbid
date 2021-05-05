@@ -30,7 +30,6 @@ canonical = { version = "0.6", optional = true }
 canonical_derive = { version = "0.6", optional = true }
 rand = "0.8"
 dusk-bytes = "0.1"
-cfg-if = "1.0"
 
 
 [features]
