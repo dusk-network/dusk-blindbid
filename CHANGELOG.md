@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2021-06-07
+
 ### Changed
+
 - Change error module to include plonk & poseidon err variants [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
 - Change crate features to not require `std` to use `proof` mod. [#135](https://github.com/dusk-network/dusk-blindbid/issues/135)
 - Change API getters returning by ref and not by value. [#124](https://github.com/dusk-network/dusk-blindbid/issues/124)
@@ -21,16 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change `rand` to be a dev-dependency [#143](https://github.com/dusk-network/dusk-blindbid/issues/143)
 
 ### Removed
+
 - Remove `anyhow` from the crate [#131](https://github.com/dusk-network/dusk-blindbid/issues/131)
 - Remove ZK-related components from the crate [#141](https://github.com/dusk-network/dusk-blindbid/issues/141)
 
-## [0.7.1] - 22-02-21
+## [0.7.1] - 2021-02-22
 
 ### Added
 
 - Add `set_eligibility` for `Bid` [#125](https://github.com/dusk-network/dusk-blindbid/issues/125)
 
-## [0.7.0] - 17-02-21
+## [0.7.0] - 2021-02-17
 
 ### Added
 
@@ -40,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Change `Bid::set_pos()` to not return `&mut u64` [#121](https://github.com/dusk-network/dusk-blindbid/issues/121)
 
-## [0.6.0] - 12-02-21
+## [0.6.0] - 2021-02-12
 
 ### Changed
 
@@ -48,13 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve naming for `Score` gen function [#118](https://github.com/dusk-network/dusk-blindbid/issues/118)
 - Consensus round seed as BlsScalar instead of u64 [#113](https://github.com/dusk-network/dusk-blindbid/issues/113)
 
-## [0.5.1] - 02-02-21
+## [0.5.1] - 2021-02-02
 
 ### Changed
 
 - Update dusk-pki to latest version
 
-## [0.5.0] - 27-01-21
+## [0.5.0] - 2021-01-27
 
 ### Added
 
