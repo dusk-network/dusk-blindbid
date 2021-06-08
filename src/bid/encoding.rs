@@ -10,10 +10,6 @@
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::Serializable;
-#[cfg(feature = "std")]
-use dusk_plonk::constraint_system::ecc::Point as PlonkPoint;
-#[cfg(feature = "std")]
-use dusk_plonk::prelude::*;
 use dusk_poseidon::sponge;
 
 // 1. Generate the type_fields Scalar Id:
@@ -26,7 +22,13 @@ use dusk_poseidon::sponge;
 // Byte-types are treated in Little Endian.
 // The purpose of this set of flags is to avoid collision between different
 // structures
-const TYPE_FIELDS: [u8; 32] = *b"53313116000000000000000000000000";
+
+/// Following the guidelines for Poseidon Hashing proving statements generation
+/// given in <https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BkfS78Y9L>, we export the field types const which
+/// will be needed by the gadgets that want to implement the hash of a [`Bid`]
+/// inside of a Circuit.
+pub const BID_HASHING_TYPE_FIELDS: [u8; 32] =
+    *b"53313116000000000000000000000000";
 
 impl Bid {
     /// Return the Bid as a set of "hasheable" parameters which is directly
@@ -40,7 +42,8 @@ impl Bid {
         // neither used to obtain this encoded form.
 
         // Safe unwrap here.
-        let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
+        let type_fields =
+            BlsScalar::from_bytes(&BID_HASHING_TYPE_FIELDS).unwrap();
         words_deposit[0] = type_fields;
 
         // 2. Encode each word.
@@ -94,175 +97,5 @@ impl Into<BlsScalar> for &Bid {
 impl Into<BlsScalar> for Bid {
     fn into(self) -> BlsScalar {
         (&self).into()
-    }
-}
-
-/// Hashes the internal Bid parameters using the Poseidon hash
-/// function and the cannonical encoding for hashing returning a
-/// Variable which contains the hash of the Bid.
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "canon")))]
-pub(crate) fn preimage_gadget(
-    composer: &mut StandardComposer,
-    // TODO: We should switch to a different representation for this.
-    // it can be a custom PoseidonCipherVariable structure or maybe
-    // just a fixed len array of Variables.
-    encrypted_data: (Variable, Variable),
-    commitment: PlonkPoint,
-    // (Pkr, R)
-    stealth_addr: (PlonkPoint, PlonkPoint),
-    hashed_secret: Variable,
-    eligibility: Variable,
-    expiration: Variable,
-    pos: Variable,
-) -> Variable {
-    // This field represents the types of the inputs and has to be the same
-    // as the default one.
-    // It has been already checked that it's safe to unwrap here since the
-    // value fits correctly in a `BlsScalar`.
-    let type_fields = BlsScalar::from_bytes(&TYPE_FIELDS).unwrap();
-
-    // Add to the composer the values required for the preimage.
-    let mut messages: Vec<Variable> = vec![];
-    messages.push(composer.add_input(type_fields));
-    // Push cipher as scalars.
-    messages.push(encrypted_data.0);
-    messages.push(encrypted_data.1);
-
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*stealth_addr.0.x());
-    messages.push(*stealth_addr.0.y());
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*stealth_addr.1.x());
-    messages.push(*stealth_addr.1.y());
-    messages.push(hashed_secret);
-    // Push both JubJubAffine coordinates as a Scalar.
-    messages.push(*commitment.x());
-    messages.push(*commitment.y());
-    // Add elebility & expiration timestamps.
-    messages.push(eligibility);
-    messages.push(expiration);
-    // Add position of the bid in the BidTree
-    messages.push(pos);
-
-    // Perform the sponge_hash inside of the Constraint System
-    sponge::gadget(composer, &messages)
-}
-
-#[cfg(feature = "std")]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use anyhow::Result;
-    use dusk_pki::{PublicSpendKey, SecretSpendKey};
-    use dusk_plonk::constraint_system::ecc::Point;
-    use dusk_plonk::jubjub::GENERATOR_EXTENDED;
-    use plonk_gadgets::AllocatedScalar;
-    use rand::Rng;
-
-    fn random_bid(secret: &JubJubScalar) -> Bid {
-        let mut rng = rand::thread_rng();
-
-        let secret_k = BlsScalar::from(*secret);
-        let pk_r = PublicSpendKey::from(SecretSpendKey::random(&mut rng));
-        let stealth_addr = pk_r.gen_stealth_address(&secret);
-        let secret = GENERATOR_EXTENDED * secret;
-        let value: u64 = (&mut rand::thread_rng())
-            .gen_range(crate::V_RAW_MIN, crate::V_RAW_MAX);
-        let value = JubJubScalar::from(value);
-
-        let eligibility = u64::MAX;
-        let expiration = u64::MAX;
-
-        Bid::new(
-            &mut rng,
-            &stealth_addr,
-            &value,
-            &secret.into(),
-            secret_k,
-            eligibility,
-            expiration,
-        )
-        .expect("Bid creation error")
-    }
-
-    #[ignore]
-    #[test]
-    fn test_word_padding() {
-        // This cannot be tested until we don't get propper test vectors from
-        // the research side.
-    }
-
-    #[test]
-    fn bid_preimage_gadget() -> Result<()> {
-        // Generate Composer & Public Parameters
-        let pub_params =
-            PublicParameters::setup(1 << 14, &mut rand::thread_rng())?;
-        let (ck, vk) = pub_params.trim(1 << 13)?;
-
-        // Generate a correct Bid
-        let secret = JubJubScalar::random(&mut rand::thread_rng());
-        let bid = random_bid(&secret);
-
-        let circuit = |composer: &mut StandardComposer, bid: &Bid| {
-            // Allocate Bid-internal fields
-            let bid_hashed_secret =
-                AllocatedScalar::allocate(composer, bid.hashed_secret);
-            let bid_cipher = (
-                composer.add_input(bid.encrypted_data.cipher()[0]),
-                composer.add_input(bid.encrypted_data.cipher()[1]),
-            );
-            let bid_commitment = Point::from_private_affine(composer, bid.c);
-            let bid_stealth_addr = (
-                Point::from_private_affine(
-                    composer,
-                    bid.stealth_address.pk_r().as_ref().into(),
-                ),
-                Point::from_private_affine(
-                    composer,
-                    bid.stealth_address.R().into(),
-                ),
-            );
-            let eligibility = AllocatedScalar::allocate(
-                composer,
-                BlsScalar::from(bid.eligibility),
-            );
-            let expiration = AllocatedScalar::allocate(
-                composer,
-                BlsScalar::from(bid.expiration),
-            );
-            let pos =
-                AllocatedScalar::allocate(composer, BlsScalar::from(bid.pos));
-            let bid_hash = preimage_gadget(
-                composer,
-                bid_cipher,
-                bid_commitment,
-                bid_stealth_addr,
-                bid_hashed_secret.var,
-                eligibility.var,
-                expiration.var,
-                pos.var,
-            );
-
-            // Constraint the hash to be equal to the real one
-            let storage_bid = bid.hash();
-            composer.constrain_to_constant(
-                bid_hash,
-                BlsScalar::zero(),
-                -storage_bid,
-            );
-        };
-        // Proving
-        let mut prover = Prover::new(b"testing");
-        circuit(prover.mut_cs(), &bid);
-        prover.preprocess(&ck)?;
-        let proof = prover.prove(&ck)?;
-
-        // Verification
-        let mut verifier = Verifier::new(b"testing");
-        circuit(verifier.mut_cs(), &bid);
-        verifier.preprocess(&ck)?;
-        let pi = verifier.mut_cs().public_inputs.clone();
-        verifier.verify(&proof, &vk, &pi)
     }
 }

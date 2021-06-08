@@ -15,8 +15,6 @@ pub(crate) mod score;
 use crate::errors::BlindBidError;
 
 #[cfg(feature = "canon")]
-use canonical::Canon;
-#[cfg(feature = "canon")]
 use canonical_derive::Canon;
 
 use core::borrow::Borrow;
@@ -37,9 +35,8 @@ pub use score::Score;
 /// to generate a [`Score`] and participate in leader election
 /// process for this consensus round iteration. In particular, a Bid provides
 /// these core functionalities among others.
-/// - Generation of a prover ID.
+/// - Generation of a Prover ID.
 /// - Generation of a Score.
-/// - Generation of a Proof of BlindBid.
 ///
 /// It is always initialized randomly, and any trick to cheat on it's
 /// initialization/construction will resume in a failure in the BindBidProof
@@ -51,54 +48,6 @@ pub use score::Score;
 /// happen, make sure to implement
 /// [PoseidonLeaf](dusk_poseidon::tree::PoseidonLeaf) trait for it or a wrapper
 /// structure.
-/// # Example
-/// ```ignore
-/// // This example only works wit `std` and `canon` features activated.
-/// use dusk_pki::{PublicSpendKey, SecretSpendKey};
-/// use dusk_plonk::jubjub::{JubJubAffine, GENERATOR_EXTENDED};
-/// use dusk_plonk::prelude::*;
-/// use rand::Rng;
-/// use dusk_blindbid::Bid;
-/// // Gen randomness source.
-/// let mut rng = rand::thread_rng();
-/// // Generate a PublicSpendKey from a SecretSpendKey.
-/// let pk_r = PublicSpendKey::from(SecretSpendKey::new(
-///     JubJubScalar::one(),
-///     -JubJubScalar::one(),
-/// ));
-/// let stealth_addr = pk_r.gen_stealth_address(&secret);
-/// // Generate a secret to encrypt the value & blinder secret values.
-/// let secret = GENERATOR_EXTENDED * JubJubScalar::random(&mut rng);
-/// // Generate the amount of Dusk we want to bid.
-/// let value: u64 = (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
-/// let value = JubJubScalar::from(value);
-/// // Set the correct consensus parameters. NOTE that the Bid is usually
-/// // created inside the Bid Contract. And therefore some of this info might be
-/// unavaliable outside. let elegibility_ts = u64::MAX;
-/// let expiration_ts = u64::MAX;
-/// Bid::new(
-///     &mut rng,
-///     &stealth_addr,
-///     &value,
-///     &secret.into(),
-///     secret_k,
-///     elegibility_ts,
-///     expiration_ts,
-/// )
-/// .expect("Bid creation error")
-///
-/// // Now with the Bid you can generate your Prover ID.
-/// // First set some consensus params as if we had them in the env.
-/// let consensus_round_seed = 2u64;
-/// let latest_consensus_round = 50u64;
-/// let latest_consensus_step = 50u64;
-/// let prover_id = bid.generate_prover_id(
-///     secret_k,
-///     BlsScalar::from(consensus_round_seed),
-///     BlsScalar::from(latest_consensus_round),
-///     BlsScalar::from(latest_consensus_step),
-/// );
-/// ```
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
@@ -249,28 +198,28 @@ impl Bid {
     }
 
     /// Returns the `encrypted_data` field of the Bid.
-    pub fn encrypted_data(&self) -> PoseidonCipher {
-        self.encrypted_data
+    pub fn encrypted_data(&self) -> &PoseidonCipher {
+        &self.encrypted_data
     }
 
     /// Returns the `nonce` field of the Bid.
-    pub fn nonce(&self) -> BlsScalar {
-        self.nonce
+    pub fn nonce(&self) -> &BlsScalar {
+        &self.nonce
     }
 
     /// Returns the `hashed_secret` field of the Bid.
-    pub fn hashed_secret(&self) -> BlsScalar {
-        self.hashed_secret
+    pub fn hashed_secret(&self) -> &BlsScalar {
+        &self.hashed_secret
     }
 
     /// Returns the `commitment` field of the Bid.
-    pub fn commitment(&self) -> JubJubAffine {
-        self.c
+    pub fn commitment(&self) -> &JubJubAffine {
+        &self.c
     }
 
     /// Returns the `eligibility` field of the Bid.
-    pub fn eligibility(&self) -> u64 {
-        self.eligibility
+    pub fn eligibility(&self) -> &u64 {
+        &self.eligibility
     }
 
     /// Sets a new value for the eligibility of the Bid.
@@ -279,8 +228,8 @@ impl Bid {
     }
 
     /// Returns the `expiration` field of the Bid.
-    pub fn expiration(&self) -> u64 {
-        self.expiration
+    pub fn expiration(&self) -> &u64 {
+        &self.expiration
     }
 
     /// Returns a mutable ref pointing to the `pos` field of the
@@ -290,8 +239,8 @@ impl Bid {
     }
 
     /// Returns the `pos` field of the Bid.
-    pub fn pos(&self) -> u64 {
-        self.pos
+    pub fn pos(&self) -> &u64 {
+        &self.pos
     }
 
     /// Sets a new value for the position of the Bid.
@@ -368,7 +317,6 @@ impl Bid {
     }
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod bid_serialization {
     use super::*;
@@ -389,7 +337,7 @@ mod bid_serialization {
             let stealth_addr = pk_r.gen_stealth_address(&secret);
             let secret = GENERATOR_EXTENDED * secret;
             let value: u64 =
-                (&mut rand::thread_rng()).gen_range(V_RAW_MIN, V_RAW_MAX);
+                (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
             let value = JubJubScalar::from(value);
             // Set the timestamps as the max values so the proofs do not fail
             // for them (never expired or non-elegible).
