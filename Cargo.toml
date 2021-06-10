@@ -28,6 +28,7 @@ rand_core = { version = "0.6", default-features = false }
 canonical = { version = "0.6", optional = true }
 canonical_derive = { version = "0.6", optional = true }
 dusk-bytes = "0.1"
+phoenix-core = { version = "0.11.0-rc.1", default-features = false }
 
 [dev-dependencies]
 rand = "0.8"
@@ -46,5 +47,8 @@ canon = [
     "canonical_derive",
     "dusk-poseidon/canon",
     "dusk-pki/canon",
+    "phoenix-core/canon"
 ]
 
+[patch.crates-io]
+phoenix-core = {git = "https://github.com/dusk-network/phoenix-core", branch = "from_err_impl", default-features = false}
