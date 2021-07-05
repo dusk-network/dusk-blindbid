@@ -20,34 +20,33 @@
 //! use dusk_bls12_381::BlsScalar;
 //! use dusk_pki::{PublicSpendKey, SecretSpendKey};
 //! use dusk_jubjub::{JubJubScalar, JubJubAffine, GENERATOR_EXTENDED};
+//! use phoenix_core::Message;
 //! use rand::{Rng, thread_rng};
 //!
 //! // Generate a Bid from some fields we have.
-//! let mut rng = thread_rng();
-//! let secret = JubJubScalar::random(&mut rand::thread_rng());
-//! let secret_k = BlsScalar::random(&mut rand::thread_rng());
-//! let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+//! let mut rng = rand::thread_rng();
+//! let psk = PublicSpendKey::from(SecretSpendKey::new(
 //!     JubJubScalar::one(),
 //!     -JubJubScalar::one(),
 //! ));
-//! let stealth_addr = pk_r.gen_stealth_address(&secret);
-//! let secret = GENERATOR_EXTENDED * secret;
-//! let value: u64 = (&mut thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
-//! let value = JubJubScalar::from(value);
+//! let secret_k = BlsScalar::one();
+//! let secret = JubJubScalar::one();
+//! let value: u64 =
+//!     (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
+//! // Set the timestamps as the max values so the proofs do not fail
+//! // for them (never expired or non-elegible).
 //! let elegibility_ts = u64::MAX;
 //! let expiration_ts = u64::MAX;
-//! let poseidon_tree_root = BlsScalar::random(&mut thread_rng());
 //!
 //! let bid = Bid::new(
-//!      &mut rng,
-//!      &stealth_addr,
-//!      &value,
-//!      &secret.into(),
-//!      secret_k,
-//!      elegibility_ts,
-//!      expiration_ts,
-//!  )
-//!  .expect("Bid creation error");
+//!     Message::new(&mut rng, &secret, &psk, value),
+//!     secret_k,
+//!     psk.gen_stealth_address(&secret),
+//!     elegibility_ts,
+//!     expiration_ts,
+//! );
+//!
+//! let poseidon_tree_root = BlsScalar::random(&mut thread_rng());
 //!
 //! // Generate fields for the Bid & required by the compute_score
 //! let consensus_round_seed = BlsScalar::random(&mut thread_rng());
@@ -68,7 +67,8 @@
 //! #[cfg(feature = "std")]
 //!  let score = Score::compute(
 //!      &bid,
-//!      &secret.into(),
+//!      &secret,
+//!      &psk,
 //!      secret_k,
 //!      poseidon_tree_root,
 //!      consensus_round_seed,
@@ -168,9 +168,3 @@ pub use errors::BlindBidError;
 pub const V_RAW_MIN: u64 = 50_000u64;
 /// The maximum amount of Dusk an user is permitted to bid.
 pub const V_RAW_MAX: u64 = 250_000u64;
-
-use dusk_jubjub::JubJubScalar;
-pub(crate) const V_MIN: JubJubScalar =
-    JubJubScalar::from_raw([V_RAW_MIN, 0, 0, 0]);
-pub(crate) const V_MAX: JubJubScalar =
-    JubJubScalar::from_raw([V_RAW_MAX, 0, 0, 0]);

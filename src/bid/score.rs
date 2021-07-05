@@ -12,7 +12,8 @@ use canonical_derive::Canon;
 #[cfg(feature = "std")]
 use {
     crate::bid::{Bid, BlindBidError},
-    dusk_jubjub::JubJubAffine,
+    dusk_jubjub::JubJubScalar,
+    dusk_pki::PublicSpendKey,
     dusk_poseidon::sponge,
     num_bigint::BigUint,
     num_traits::{One, Zero},
@@ -111,7 +112,8 @@ impl Score {
     /// Given a `Bid`, compute it's Score and return it.
     pub fn compute(
         bid: &Bid,
-        secret: &JubJubAffine,
+        secret: &JubJubScalar,
+        psk: &PublicSpendKey,
         secret_k: BlsScalar,
         bid_tree_root: BlsScalar,
         consensus_round_seed: BlsScalar,
@@ -134,7 +136,7 @@ impl Score {
             latest_consensus_round,
             latest_consensus_step,
         ]);
-        let (value, _) = bid.decrypt_data(secret)?;
+        let (value, _) = bid.decrypt_data(secret, psk)?;
 
         // Truncate Y to left 128 bits and interpret the result as 128-bit
         // integer. Keep the right 128 bits as another integer (r1).
