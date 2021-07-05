@@ -10,6 +10,7 @@
 use super::Bid;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::Serializable;
+use dusk_jubjub::JubJubAffine;
 use dusk_poseidon::sponge;
 
 // 1. Generate the type_fields Scalar Id:
@@ -48,8 +49,8 @@ impl Bid {
 
         // 2. Encode each word.
         // Push cipher as scalars.
-        words_deposit[1] = self.encrypted_data.cipher()[0];
-        words_deposit[2] = self.encrypted_data.cipher()[1];
+        words_deposit[1] = self.encrypted_data()[0];
+        words_deposit[2] = self.encrypted_data()[1];
 
         // Push both JubJubAffine coordinates as a Scalar.
         {
@@ -67,8 +68,8 @@ impl Bid {
         words_deposit[7] = self.hashed_secret;
 
         // Push both JubJubAffine coordinates as a Scalar.
-        words_deposit[8] = self.c.get_x();
-        words_deposit[9] = self.c.get_y();
+        words_deposit[8] = JubJubAffine::from(self.commitment()).get_x();
+        words_deposit[9] = JubJubAffine::from(self.commitment()).get_y();
         // Push the timestamps of the Bid
         words_deposit[10] = BlsScalar::from(self.eligibility);
         words_deposit[11] = BlsScalar::from(self.expiration);

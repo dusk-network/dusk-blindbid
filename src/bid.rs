@@ -10,23 +10,22 @@
 //! - Generation of a prover ID.
 //! - Generation of a Score.
 //! - Generation of a Proof of BlindBid.
+
 pub(crate) mod encoding;
 pub(crate) mod score;
-use crate::errors::BlindBidError;
 
 #[cfg(feature = "canon")]
 use canonical_derive::Canon;
 
+use crate::errors::BlindBidError;
 use core::borrow::Borrow;
 use dusk_bls12_381::BlsScalar;
 use dusk_bytes::{DeserializableSlice, Serializable};
-use dusk_jubjub::{
-    JubJubAffine, JubJubScalar, GENERATOR_EXTENDED, GENERATOR_NUMS_EXTENDED,
-};
-use dusk_pki::{Ownable, StealthAddress};
+use dusk_jubjub::{JubJubExtended, JubJubScalar};
+use dusk_pki::{Ownable, PublicSpendKey, StealthAddress};
 use dusk_poseidon::cipher::PoseidonCipher;
 use dusk_poseidon::sponge;
-use rand_core::{CryptoRng, RngCore};
+use phoenix_core::Message;
 pub use score::Score;
 
 /// The Bid structure contains all of the logic and information needed to be
@@ -51,16 +50,11 @@ pub use score::Score;
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "canon", derive(Canon))]
 pub struct Bid {
-    /// Encrypted value and blinder.
-    encrypted_data: PoseidonCipher,
-    /// Nonce used by the cypher.
-    nonce: BlsScalar,
+    pub(crate) message: Message,
     /// Stealth address of the bidder.
     stealth_address: StealthAddress,
-    /// Hashed secret
+    /// Hashed secret (m)
     pub(crate) hashed_secret: BlsScalar,
-    /// Commitment containing value & blinder fields hidden.
-    pub(crate) c: JubJubAffine,
     /// Elegibility height
     pub(crate) eligibility: u64,
     /// Expiration height
@@ -93,34 +87,24 @@ impl Eq for Bid {}
 // params aren't perfectly supported yet.
 impl
     Serializable<
-        {
-            PoseidonCipher::SIZE
-                + StealthAddress::SIZE
-                + 2 * BlsScalar::SIZE
-                + JubJubAffine::SIZE
-                + 8 * 3
-        },
+        { Message::SIZE + StealthAddress::SIZE + BlsScalar::SIZE + 8 * 3 },
     > for Bid
 {
     type Error = dusk_bytes::Error;
 
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Bid, Self::Error> {
         let mut buffer = &buf[..];
-        let encrypted_data = PoseidonCipher::from_reader(&mut buffer)?;
-        let nonce = BlsScalar::from_reader(&mut buffer)?;
+        let message = Message::from_reader(&mut buffer)?;
         let stealth_address = StealthAddress::from_reader(&mut buffer)?;
         let hashed_secret = BlsScalar::from_reader(&mut buffer)?;
-        let c = JubJubAffine::from_reader(&mut buffer)?;
         let eligibility = u64::from_reader(&mut buffer)?;
         let expiration = u64::from_reader(&mut buffer)?;
         let pos = u64::from_reader(&mut buffer)?;
 
         Ok(Bid {
-            encrypted_data,
-            nonce,
+            message,
             stealth_address,
             hashed_secret,
-            c,
             eligibility,
             expiration,
             pos,
@@ -133,11 +117,9 @@ impl
 
         let mut buf = [0u8; Self::SIZE];
         let mut writer = &mut buf[..];
-        writer.write(&self.encrypted_data.to_bytes());
-        writer.write(&self.nonce.to_bytes());
+        writer.write(&self.message.to_bytes());
         writer.write(&self.stealth_address.to_bytes());
         writer.write(&self.hashed_secret.to_bytes());
-        writer.write(&self.c.to_bytes());
         writer.write(&self.eligibility.to_bytes());
         writer.write(&self.expiration.to_bytes());
         writer.write(&self.pos.to_bytes());
@@ -146,65 +128,36 @@ impl
 }
 
 impl Bid {
-    /// Generates a new Bid from a rng source plus it's fields.  
-    pub fn new<R>(
-        rng: &mut R,
-        stealth_address: &StealthAddress,
-        value: &JubJubScalar,
-        secret: &JubJubAffine,
-        secret_k: BlsScalar,
+    /// Generate a new Bid from a [`Message`], the hashed secret(m) and a
+    /// [`StealthAddress`].
+    pub fn new(
+        message: Message,
+        hashed_secret: BlsScalar,
+        addr: StealthAddress,
         eligibility: u64,
         expiration: u64,
-    ) -> Result<Self, BlindBidError>
-    where
-        R: RngCore + CryptoRng,
-    {
-        // Check if the bid_value is in the correct range, otherways, fail.
-        match (
-            value.reduce() > crate::V_MAX.reduce(),
-            value.reduce() < crate::V_MIN.reduce(),
-        ) {
-            (true, false) => {
-                return Err(BlindBidError::MaximumBidValueExceeded {
-                    max_val: crate::V_MAX,
-                    found: *value,
-                })?;
-            }
-            (false, true) => {
-                return Err(BlindBidError::MinimumBidValueUnreached {
-                    min_val: crate::V_MIN,
-                    found: *value,
-                });
-            }
-            (false, false) => (),
-            (_, _) => unreachable!(),
-        };
-        // Generate an empty Bid and fill it with the correct values
-        let mut bid = Bid {
-            // Compute and add the `hashed_secret` to the Bid.
-            hashed_secret: sponge::hash(&[secret_k]),
+    ) -> Bid {
+        Bid {
+            message,
+            hashed_secret,
+            stealth_address: addr,
             eligibility,
             expiration,
-            c: JubJubAffine::default(),
-            stealth_address: *stealth_address,
-            encrypted_data: PoseidonCipher::default(),
-            nonce: BlsScalar::default(),
             pos: 0u64,
-        };
-
-        bid.set_value(rng, value, secret);
-
-        Ok(bid)
+        }
     }
 
-    /// Returns the `encrypted_data` field of the Bid.
-    pub fn encrypted_data(&self) -> &PoseidonCipher {
-        &self.encrypted_data
+    /// Returns the raw cipher data from the [`PoseidonCipher`] located inside
+    /// of the [`Message`] field of the Bid.
+    pub fn encrypted_data(
+        &self,
+    ) -> &[BlsScalar; PoseidonCipher::cipher_size()] {
+        self.message.cipher()
     }
 
     /// Returns the `nonce` field of the Bid.
     pub fn nonce(&self) -> &BlsScalar {
-        &self.nonce
+        &self.message.nonce()
     }
 
     /// Returns the `hashed_secret` field of the Bid.
@@ -213,8 +166,8 @@ impl Bid {
     }
 
     /// Returns the `commitment` field of the Bid.
-    pub fn commitment(&self) -> &JubJubAffine {
-        &self.c
+    pub fn commitment(&self) -> &JubJubExtended {
+        self.message.value_commitment()
     }
 
     /// Returns the `eligibility` field of the Bid.
@@ -276,44 +229,13 @@ impl Bid {
     /// values used to generate the bid commitment.
     pub fn decrypt_data(
         &self,
-        secret: &JubJubAffine,
+        secret: &JubJubScalar,
+        psk: &PublicSpendKey,
     ) -> Result<(JubJubScalar, JubJubScalar), BlindBidError> {
-        self.encrypted_data
-            .decrypt(secret, &self.nonce)
-            .map(|message| {
-                let value = message[0];
-                let blinder = message[1];
-
-                let value =
-                    JubJubScalar::from_raw(*value.reduce().internal_repr());
-                let blinder =
-                    JubJubScalar::from_raw(*blinder.reduce().internal_repr());
-
-                (value, blinder)
-            })
+        self.message
+            .decrypt(secret, psk)
             .map_err(|_| BlindBidError::WrongSecretProvided)
-    }
-
-    pub(crate) fn set_value<R>(
-        &mut self,
-        rng: &mut R,
-        value: &JubJubScalar,
-        secret: &JubJubAffine,
-    ) where
-        R: RngCore + CryptoRng,
-    {
-        let blinder = JubJubScalar::random(rng);
-        self.nonce = BlsScalar::random(rng);
-        self.encrypted_data = PoseidonCipher::encrypt(
-            &[(*value).into(), blinder.into()],
-            secret,
-            &self.nonce,
-        );
-
-        self.c = JubJubAffine::from(
-            &(GENERATOR_EXTENDED * value)
-                + &(GENERATOR_NUMS_EXTENDED * blinder),
-        );
+            .map(|(value, blinder)| (JubJubScalar::from(value), blinder))
     }
 }
 
@@ -328,32 +250,26 @@ mod bid_serialization {
     fn bid_serialization_roundtrip() {
         let bid = {
             let mut rng = rand::thread_rng();
-            let pk_r = PublicSpendKey::from(SecretSpendKey::new(
+            let psk = PublicSpendKey::from(SecretSpendKey::new(
                 JubJubScalar::one(),
                 -JubJubScalar::one(),
             ));
             let secret_k = BlsScalar::one();
             let secret = JubJubScalar::one();
-            let stealth_addr = pk_r.gen_stealth_address(&secret);
-            let secret = GENERATOR_EXTENDED * secret;
             let value: u64 =
                 (&mut rand::thread_rng()).gen_range(V_RAW_MIN..V_RAW_MAX);
-            let value = JubJubScalar::from(value);
             // Set the timestamps as the max values so the proofs do not fail
             // for them (never expired or non-elegible).
             let elegibility_ts = u64::MAX;
             let expiration_ts = u64::MAX;
 
             Bid::new(
-                &mut rng,
-                &stealth_addr,
-                &value,
-                &secret.into(),
+                Message::new(&mut rng, &secret, &psk, value),
                 secret_k,
+                psk.gen_stealth_address(&secret),
                 elegibility_ts,
                 expiration_ts,
             )
-            .expect("Bid creation error")
         };
 
         let bid_bytes = bid.to_bytes();
