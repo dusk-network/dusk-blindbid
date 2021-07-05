@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2021-07-05
+
+### Added
+
+- Add `phoenix-core` to deps. [#145]
+
+### Changed
+
+- Change Bid struct to include Message [#145]
+- Change deps to remove the `rc` [#147]
+
 ## [0.8.0] - 2021-06-07
 
 ### Changed
@@ -70,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update deps to latest versions [#103]
 - Restructure the entire API of the crate
 
-
+[#147](https://github.com/dusk-network/dusk-blindbid/pull/147)
+[#145](https://github.com/dusk-network/dusk-blindbid/issues/145)
 [#135](https://github.com/dusk-network/dusk-blindbid/issues/135)
 [#124](https://github.com/dusk-network/dusk-blindbid/issues/124)
 [#129](https://github.com/dusk-network/dusk-blindbid/issues/129)
