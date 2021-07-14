@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update `dusk-poseidon` from `0.21` to `0.22` [#148]
+- Update `dusk-pki` from `0.7` to `0.8` [#148]
+- Update `phoenix-core` from `0.12` to `0.13` [#148]
+
 ## [0.9.0] - 2021-07-05
 
 ### Added
@@ -81,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update deps to latest versions [#103]
 - Restructure the entire API of the crate
 
+[#148](https://github.com/dusk-network/dusk-blindbid/issues/148)
 [#147](https://github.com/dusk-network/dusk-blindbid/pull/147)
 [#145](https://github.com/dusk-network/dusk-blindbid/issues/145)
 [#135](https://github.com/dusk-network/dusk-blindbid/issues/135)
