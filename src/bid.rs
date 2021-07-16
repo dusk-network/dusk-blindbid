@@ -148,8 +148,8 @@ impl Bid {
     }
 
     /// Returns the `message` field of the Bid.
-    pub fn message(&self) -> Message {
-        self.message
+    pub const fn message(&self) -> &Message {
+        &self.message
     }
 
     /// Returns the raw cipher data from the [`PoseidonCipher`] located inside
