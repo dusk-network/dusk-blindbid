@@ -154,29 +154,29 @@ impl Bid {
 
     /// Returns the raw cipher data from the [`PoseidonCipher`] located inside
     /// of the [`Message`] field of the Bid.
-    pub fn encrypted_data(
+    pub const fn encrypted_data(
         &self,
     ) -> &[BlsScalar; PoseidonCipher::cipher_size()] {
         self.message.cipher()
     }
 
     /// Returns the `nonce` field of the Bid.
-    pub fn nonce(&self) -> &BlsScalar {
+    pub const fn nonce(&self) -> &BlsScalar {
         &self.message.nonce()
     }
 
     /// Returns the `hashed_secret` field of the Bid.
-    pub fn hashed_secret(&self) -> &BlsScalar {
+    pub const fn hashed_secret(&self) -> &BlsScalar {
         &self.hashed_secret
     }
 
     /// Returns the `commitment` field of the Bid.
-    pub fn commitment(&self) -> &JubJubExtended {
+    pub const fn commitment(&self) -> &JubJubExtended {
         self.message.value_commitment()
     }
 
     /// Returns the `eligibility` field of the Bid.
-    pub fn eligibility(&self) -> &u64 {
+    pub const fn eligibility(&self) -> &u64 {
         &self.eligibility
     }
 
@@ -186,7 +186,7 @@ impl Bid {
     }
 
     /// Returns the `expiration` field of the Bid.
-    pub fn expiration(&self) -> &u64 {
+    pub const fn expiration(&self) -> &u64 {
         &self.expiration
     }
 
@@ -197,7 +197,7 @@ impl Bid {
     }
 
     /// Returns the `pos` field of the Bid.
-    pub fn pos(&self) -> &u64 {
+    pub const fn pos(&self) -> &u64 {
         &self.pos
     }
 
