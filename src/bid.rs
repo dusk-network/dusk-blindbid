@@ -147,6 +147,11 @@ impl Bid {
         }
     }
 
+    /// Returns the `message` field of the Bid.
+    pub fn message(&self) -> Message {
+        self.message
+    }
+
     /// Returns the raw cipher data from the [`PoseidonCipher`] located inside
     /// of the [`Message`] field of the Bid.
     pub fn encrypted_data(
