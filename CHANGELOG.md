@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add message getter for `Bid` [#150]
 ### Changed
 
 - Update `dusk-poseidon` from `0.21` to `0.22` [#148]
@@ -87,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update deps to latest versions [#103]
 - Restructure the entire API of the crate
 
+[#150](https://github.com/dusk-network/dusk-blindbid/issues/150)
 [#148](https://github.com/dusk-network/dusk-blindbid/issues/148)
 [#147](https://github.com/dusk-network/dusk-blindbid/pull/147)
 [#145](https://github.com/dusk-network/dusk-blindbid/issues/145)
