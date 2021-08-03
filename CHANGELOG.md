@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `dusk-poseidon` from `0.21` to `0.22` [#148]
 - Update `dusk-pki` from `0.7` to `0.8` [#148]
-- Update `phoenix-core` from `0.12` to `0.13` [#148]
+- Update `phoenix-core` from `0.12` to `0.14.0-rc.0` [#148]
 
 ## [0.9.0] - 2021-07-05
 
